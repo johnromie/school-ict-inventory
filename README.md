@@ -12,6 +12,16 @@ DepEd-style ICT inventory with separate Admin and School login, CSV upload per s
 2. Double-click `start-local-server.bat` or `autorun.bat`.
 3. Open `http://localhost:8000`.
 
+## Auto-push changes to GitHub
+1. Run `start-github-autosync.bat`.
+2. Edit files normally in VS Code.
+3. The watcher auto-commits and pushes changes to your current branch after a few seconds.
+4. To stop, run `stop-github-autosync.bat`.
+
+Notes:
+- Requires git repo + GitHub remote + logged-in git credentials.
+- Uses commit message format: `auto-sync: YYYY-MM-DD HH:mm:ss`.
+
 ## Deploy on Render (works on any network)
 1. Push this project to GitHub.
 2. In Render, click `New +` -> `Blueprint`.
