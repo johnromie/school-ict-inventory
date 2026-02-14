@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Combined View - ICT Inventory</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="admin">
+  <div class="govBanner">
+    <img src="assets/top.webp" alt="DepEd Marinduque Header" />
+  </div>
+
+  <header class="appHeader">
+    <div>
+      <h1>Admin Combined ICT Inventory</h1>
+      <p>Schools Division of Marinduque</p>
+    </div>
+    <div class="topActions" id="topActions">
+      <button class="btn primary" data-view="inventory">Inventory List</button>
+      <button class="btn ghost" data-view="imports">View Imported CSV</button>
+      <button class="btn ghost" data-view="deleted">Deleted Records</button>
+      <span class="pill" id="activeSchoolBadge">ICT Admin</span>
+      <button class="btn ghost" id="logoutBtn" type="button">Logout</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <section id="workspace">
+      <section class="panel">
+        <div class="stats">
+          <span class="stat" id="summary">Loading...</span>
+          <span class="stat" id="message">Ready.</span>
+        </div>
+      </section>
+
+      <section id="inventoryView" class="panel viewPanel">
+        <div class="panelHead">
+          <h2>Inventory List</h2>
+          <input id="searchInput" type="search" placeholder="Search item, condition, remarks..." />
+        </div>
+        <div class="tableWrap">
+          <table class="inventoryTable">
+            <thead>
+              <tr>
+                <th>School ID</th>
+                <th>School Name</th>
+                <th>Item Name</th>
+                <th>Quantity</th>
+                <th>Condition</th>
+                <th>Remarks</th>
+              </tr>
+            </thead>
+            <tbody id="inventoryBody">
+              <tr><td colspan="6" class="empty">No records found.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="importsView" class="panel viewPanel hidden">
+        <div class="panelHead">
+          <h2>Imported CSV (Excel View)</h2>
+        </div>
+        <div class="tableWrap">
+          <table class="inventoryTable">
+            <thead>
+              <tr>
+                <th>File Name</th>
+                <th>Rows</th>
+                <th>Imported At</th>
+              </tr>
+            </thead>
+            <tbody id="importsBody">
+              <tr><td colspan="3" class="empty">No imported CSV yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="deletedView" class="panel viewPanel hidden">
+        <div class="panelHead">
+          <h2>Deleted Records</h2>
+        </div>
+        <div class="tableWrap">
+          <table class="inventoryTable">
+            <thead>
+              <tr>
+                <th>File Name</th>
+                <th>Rows</th>
+                <th>Deleted At</th>
+              </tr>
+            </thead>
+            <tbody id="deletedBody">
+              <tr><td colspan="3" class="empty">No deleted records.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="adminAccountsPanel" class="panel">
+        <div class="panelHead">
+          <h2>Admin Account Management</h2>
+        </div>
+        <div class="formGrid2">
+          <label>
+            New Admin Username
+            <input id="newAdminUsername" type="text" placeholder="example: ictassistant" />
+          </label>
+          <label>
+            New Admin Password
+            <input id="newAdminPassword" type="password" placeholder="At least 6 characters" />
+          </label>
+        </div>
+        <button id="addAdminBtn" class="btn secondary" type="button">Add Admin Account</button>
+
+        <hr />
+
+        <div class="formGrid2">
+          <label>
+            Current Password
+            <input id="currentAdminPassword" type="password" placeholder="Enter current password" />
+          </label>
+          <label>
+            New Password
+            <input id="changeAdminPassword" type="password" placeholder="Enter new password" />
+          </label>
+        </div>
+        <button id="changeAdminPasswordBtn" class="btn primary" type="button">Change My Admin Password</button>
+        <p id="adminManageMessage" class="hint"></p>
+
+        <div class="tableWrap" style="margin-top:10px;">
+          <table class="inventoryTable">
+            <thead>
+              <tr>
+                <th>Admin Username</th>
+                <th>Created At</th>
+              </tr>
+            </thead>
+            <tbody id="adminUsersBody">
+              <tr><td colspan="2" class="empty">No admin users.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="admin.js"></script>
+</body>
+</html>

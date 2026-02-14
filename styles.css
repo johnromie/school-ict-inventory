@@ -1,0 +1,214 @@
+:root {
+  --text: #1f2937;
+  --muted: #6b7280;
+  --primary: #0c3f8f;
+  --secondary: #0b5d4a;
+  --border: #d1d5db;
+  --panel: rgba(247, 249, 252, 0.95);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  color: var(--text);
+  min-height: 100vh;
+  background: #10233d;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: linear-gradient(rgba(10, 26, 49, 0.72), rgba(10, 26, 49, 0.72)), url("assets/bg.jpg");
+  background-size: cover, cover;
+  background-position: center;
+  z-index: -1;
+}
+
+.govBanner {
+  background: #123b91;
+  border-bottom: 1px solid rgba(255,255,255,0.25);
+}
+
+.govBanner img {
+  width: 100%;
+  display: block;
+  max-height: 150px;
+  object-fit: contain;
+}
+
+.appHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(245, 247, 250, 0.96);
+  border-bottom: 1px solid #dbe3ef;
+}
+
+.appHeader h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.appHeader p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.topActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.page {
+  padding: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 8px 24px rgba(16, 35, 61, 0.15);
+}
+
+.loginPanel {
+  max-width: 520px;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 1.6rem;
+}
+
+.formGrid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 10px 0;
+}
+
+label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+
+input, button {
+  font: inherit;
+}
+
+input {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #fff;
+}
+
+.btn {
+  border: 0;
+  border-radius: 8px;
+  padding: 9px 14px;
+  cursor: pointer;
+}
+
+.btn.primary { background: var(--primary); color: #fff; }
+.btn.secondary { background: var(--secondary); color: #fff; }
+.btn.ghost { background: #eef2f7; color: #1f2937; border: 1px solid #d7dee8; }
+
+.pill {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eaf3ff;
+  border: 1px solid #bdd7ff;
+  font-size: 0.85rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.panelHead {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.stats {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stat {
+  background: #eef4fb;
+  border: 1px solid #cad9ee;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.84rem;
+}
+
+#message.error {
+  color: #991b1b;
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.tableWrap {
+  overflow: auto;
+}
+
+.inventoryTable {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  min-width: 760px;
+}
+
+.inventoryTable thead th {
+  position: sticky;
+  top: 0;
+  background: #1f6b4f;
+  color: #fff;
+  border: 1px solid #184f3a;
+  padding: 8px 7px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.inventoryTable td {
+  border: 1px solid #c5ced6;
+  padding: 7px;
+  font-size: 0.8rem;
+  background: #f8fafc;
+  white-space: nowrap;
+}
+
+.inventoryTable tr:nth-child(even) td {
+  background: #f1f5f9;
+}
+
+.empty { text-align: center; color: #64748b; }
+.hint { color: var(--muted); }
+.hidden { display: none !important; }
+
+@media (max-width: 900px) {
+  .appHeader { flex-direction: column; align-items: flex-start; }
+  .formGrid2 { grid-template-columns: 1fr; }
+}
