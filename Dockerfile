@@ -1,6 +1,9 @@
 FROM php:8.2-cli
 
-RUN docker-php-ext-install pdo pdo_sqlite
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends libsqlite3-dev \
+  && docker-php-ext-install pdo pdo_sqlite \
+  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/render/project/src
 
