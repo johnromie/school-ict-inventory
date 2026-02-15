@@ -1,5 +1,6 @@
 const logoutBtn = document.getElementById("logoutBtn");
 const activeSchoolBadge = document.getElementById("activeSchoolBadge");
+const exportCsvBtn = document.getElementById("exportCsvBtn");
 const pickCsvBtn = document.getElementById("pickCsvBtn");
 const uploadBtn = document.getElementById("uploadBtn");
 const csvFileInput = document.getElementById("csvFile");
@@ -96,7 +97,7 @@ function renderImports() {
 
 function renderDeleted() {
   if (!deletedRows.length) {
-    deletedBody.innerHTML = '<tr><td colspan="3" class="empty">No deleted records.</td></tr>';
+    deletedBody.innerHTML = '<tr><td colspan="4" class="empty">No deleted records.</td></tr>';
     return;
   }
 
@@ -105,8 +106,30 @@ function renderDeleted() {
       <td>${row.file_name}</td>
       <td>${row.row_count}</td>
       <td>${new Date(row.deleted_at).toLocaleString()}</td>
+      <td>
+        ${row.can_restore ? `<button class="btn ghost restoreDeletedBtn" data-id="${row.id}" type="button">Restore</button>` : "Not restorable"}
+      </td>
     </tr>
   `).join("");
+
+  document.querySelectorAll(".restoreDeletedBtn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = Number(btn.dataset.id);
+      if (!id) return;
+      try {
+        await api("restore_deleted", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deletedLogId: id }),
+        });
+        setMessage("Deleted inventory restored.");
+        await refreshData();
+        switchView("inventory");
+      } catch (error) {
+        setMessage(error.message, true);
+      }
+    });
+  });
 }
 
 async function refreshData() {
@@ -143,6 +166,38 @@ async function init() {
 }
 
 pickCsvBtn.addEventListener("click", () => csvFileInput.click());
+
+exportCsvBtn.addEventListener("click", () => {
+  const header = ["item_name", "quantity", "condition", "remarks"];
+  const rows = inventoryRows.map((row) => [
+    row.item_name ?? "",
+    row.quantity ?? "",
+    row.item_condition ?? "",
+    row.remarks ?? "",
+  ]);
+
+  const csv = [
+    header.join(","),
+    ...rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")),
+  ].join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  const fileName = `${activeSession.schoolId}_${activeSession.schoolName.replace(/\s+/g, "_")}_${y}${m}${d}.csv`;
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  setMessage(`Exported CSV: ${fileName}`);
+});
 
 csvFileInput.addEventListener("change", () => {
   const file = csvFileInput.files[0];

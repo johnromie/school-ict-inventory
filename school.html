@@ -19,6 +19,7 @@
     <div class="topActions" id="topActions">
       <button class="btn primary" data-view="inventory">Inventory List</button>
       <button class="btn ghost" data-view="imports">View Imported CSV</button>
+      <button class="btn ghost" id="exportCsvBtn" type="button">Export CSV</button>
       <button class="btn ghost" data-view="deleted">Deleted Records</button>
       <span class="pill" id="activeSchoolBadge">No active school</span>
       <button class="btn ghost" id="logoutBtn" type="button">Logout</button>
@@ -96,10 +97,11 @@
                 <th>File Name</th>
                 <th>Rows</th>
                 <th>Deleted At</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody id="deletedBody">
-              <tr><td colspan="3" class="empty">No deleted records.</td></tr>
+              <tr><td colspan="4" class="empty">No deleted records.</td></tr>
             </tbody>
           </table>
         </div>

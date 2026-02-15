@@ -85,9 +85,28 @@ function db(): PDO {
       school_id TEXT NOT NULL,
       file_name TEXT NOT NULL,
       row_count INTEGER NOT NULL DEFAULT 0,
+      deleted_at TEXT NOT NULL,
+      restored_at TEXT
+    );
+  ");
+
+  $pdo->exec("
+    CREATE TABLE IF NOT EXISTS deleted_inventory_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      deleted_log_id INTEGER NOT NULL,
+      school_id TEXT NOT NULL,
+      item_name TEXT NOT NULL,
+      quantity INTEGER NOT NULL DEFAULT 0,
+      item_condition TEXT NOT NULL,
+      remarks TEXT NOT NULL,
       deleted_at TEXT NOT NULL
     );
   ");
+
+  try {
+    $pdo->exec("ALTER TABLE deleted_logs ADD COLUMN restored_at TEXT");
+  } catch (Throwable $ignored) {
+  }
 
   $upsertSchool = $pdo->prepare("
     INSERT INTO schools (school_id, school_name)
@@ -148,6 +167,43 @@ function read_json_input(): array {
   if (!$raw) return [];
   $data = json_decode($raw, true);
   return is_array($data) ? $data : [];
+}
+
+function archive_current_inventory(PDO $pdo, string $schoolId, string $fileName, string $timestamp): int {
+  $countStmt = $pdo->prepare("SELECT COUNT(*) as total FROM inventory_items WHERE school_id = :school_id");
+  $countStmt->execute([":school_id" => $schoolId]);
+  $rowCount = (int)($countStmt->fetch()["total"] ?? 0);
+  if ($rowCount === 0) {
+    return 0;
+  }
+
+  $deletedStmt = $pdo->prepare("
+    INSERT INTO deleted_logs (school_id, file_name, row_count, deleted_at)
+    VALUES (:school_id, :file_name, :row_count, :deleted_at);
+  ");
+  $deletedStmt->execute([
+    ":school_id" => $schoolId,
+    ":file_name" => $fileName,
+    ":row_count" => $rowCount,
+    ":deleted_at" => $timestamp,
+  ]);
+  $deletedLogId = (int)$pdo->lastInsertId();
+
+  $snapshotStmt = $pdo->prepare("
+    INSERT INTO deleted_inventory_items (
+      deleted_log_id, school_id, item_name, quantity, item_condition, remarks, deleted_at
+    )
+    SELECT :deleted_log_id, school_id, item_name, quantity, item_condition, remarks, :deleted_at
+    FROM inventory_items
+    WHERE school_id = :school_id;
+  ");
+  $snapshotStmt->execute([
+    ":deleted_log_id" => $deletedLogId,
+    ":deleted_at" => $timestamp,
+    ":school_id" => $schoolId,
+  ]);
+
+  return $deletedLogId;
 }
 
 function parse_csv_upload(string $content): array {
@@ -273,22 +329,7 @@ try {
 
     $pdo->beginTransaction();
 
-    $countStmt = $pdo->prepare("SELECT COUNT(*) as total FROM inventory_items WHERE school_id = :school_id");
-    $countStmt->execute([":school_id" => $schoolId]);
-    $previousCount = (int)($countStmt->fetch()["total"] ?? 0);
-
-    if ($previousCount > 0) {
-      $deletedStmt = $pdo->prepare("
-        INSERT INTO deleted_logs (school_id, file_name, row_count, deleted_at)
-        VALUES (:school_id, :file_name, :row_count, :deleted_at);
-      ");
-      $deletedStmt->execute([
-        ":school_id" => $schoolId,
-        ":file_name" => "previous_inventory.csv",
-        ":row_count" => $previousCount,
-        ":deleted_at" => $now,
-      ]);
-    }
+    archive_current_inventory($pdo, $schoolId, "previous_inventory.csv", $now);
 
     $pdo->prepare("DELETE FROM inventory_items WHERE school_id = :school_id")
       ->execute([":school_id" => $schoolId]);
@@ -376,7 +417,10 @@ try {
     $user = require_login();
     if (($user["role"] ?? "") === "admin") {
       $stmt = $pdo->query("
-        SELECT l.file_name, l.row_count, l.deleted_at, s.school_id, s.school_name
+        SELECT l.id, l.file_name, l.row_count, l.deleted_at, l.restored_at, s.school_id, s.school_name,
+               CASE WHEN l.restored_at IS NULL AND EXISTS (
+                 SELECT 1 FROM deleted_inventory_items di WHERE di.deleted_log_id = l.id
+               ) THEN 1 ELSE 0 END AS can_restore
         FROM deleted_logs l
         JOIN schools s ON s.school_id = l.school_id
         ORDER BY l.deleted_at DESC;
@@ -384,7 +428,10 @@ try {
       $rows = $stmt->fetchAll();
     } else {
       $stmt = $pdo->prepare("
-        SELECT l.file_name, l.row_count, l.deleted_at, s.school_id, s.school_name
+        SELECT l.id, l.file_name, l.row_count, l.deleted_at, l.restored_at, s.school_id, s.school_name,
+               CASE WHEN l.restored_at IS NULL AND EXISTS (
+                 SELECT 1 FROM deleted_inventory_items di WHERE di.deleted_log_id = l.id
+               ) THEN 1 ELSE 0 END AS can_restore
         FROM deleted_logs l
         JOIN schools s ON s.school_id = l.school_id
         WHERE l.school_id = :school_id
@@ -401,9 +448,105 @@ try {
     if (($user["role"] ?? "") !== "school") {
       json_response(["ok" => false, "message" => "Only school accounts can clear deleted logs."], 403);
     }
+    $schoolId = (string)$user["schoolId"];
+    $pdo->beginTransaction();
+
+    $idsStmt = $pdo->prepare("SELECT id FROM deleted_logs WHERE school_id = :school_id");
+    $idsStmt->execute([":school_id" => $schoolId]);
+    $ids = array_map(static fn($r) => (int)$r["id"], $idsStmt->fetchAll());
+
+    if (count($ids) > 0) {
+      $placeholders = implode(",", array_fill(0, count($ids), "?"));
+      $deleteItemsStmt = $pdo->prepare("DELETE FROM deleted_inventory_items WHERE deleted_log_id IN ($placeholders)");
+      $deleteItemsStmt->execute($ids);
+    }
+
     $stmt = $pdo->prepare("DELETE FROM deleted_logs WHERE school_id = :school_id");
-    $stmt->execute([":school_id" => (string)$user["schoolId"]]);
+    $stmt->execute([":school_id" => $schoolId]);
+    $pdo->commit();
     json_response(["ok" => true, "message" => "Deleted logs cleared."]);
+  }
+
+  if ($action === "restore_deleted") {
+    $user = require_login();
+    if (($user["role"] ?? "") !== "school") {
+      json_response(["ok" => false, "message" => "Only school accounts can restore deleted files."], 403);
+    }
+    $data = read_json_input();
+    $deletedLogId = (int)($data["deletedLogId"] ?? 0);
+    if ($deletedLogId <= 0) {
+      json_response(["ok" => false, "message" => "Invalid deleted log id."], 400);
+    }
+
+    $schoolId = (string)$user["schoolId"];
+    $logStmt = $pdo->prepare("
+      SELECT id, school_id, file_name, restored_at
+      FROM deleted_logs
+      WHERE id = :id
+      LIMIT 1
+    ");
+    $logStmt->execute([":id" => $deletedLogId]);
+    $log = $logStmt->fetch();
+    if (!$log || (string)$log["school_id"] !== $schoolId) {
+      json_response(["ok" => false, "message" => "Deleted log not found."], 404);
+    }
+    if (!empty($log["restored_at"])) {
+      json_response(["ok" => false, "message" => "This deleted file is already restored."], 409);
+    }
+
+    $snapshotStmt = $pdo->prepare("
+      SELECT item_name, quantity, item_condition, remarks
+      FROM deleted_inventory_items
+      WHERE deleted_log_id = :deleted_log_id
+      ORDER BY id ASC
+    ");
+    $snapshotStmt->execute([":deleted_log_id" => $deletedLogId]);
+    $snapshotRows = $snapshotStmt->fetchAll();
+    if (count($snapshotRows) === 0) {
+      json_response(["ok" => false, "message" => "No snapshot data available for this deleted file."], 409);
+    }
+
+    $now = (new DateTimeImmutable("now"))->format(DateTimeInterface::ATOM);
+    $pdo->beginTransaction();
+
+    archive_current_inventory($pdo, $schoolId, "before_restore_inventory.csv", $now);
+
+    $pdo->prepare("DELETE FROM inventory_items WHERE school_id = :school_id")
+      ->execute([":school_id" => $schoolId]);
+
+    $insertItem = $pdo->prepare("
+      INSERT INTO inventory_items (school_id, item_name, quantity, item_condition, remarks, updated_at)
+      VALUES (:school_id, :item_name, :quantity, :item_condition, :remarks, :updated_at)
+    ");
+    foreach ($snapshotRows as $row) {
+      $insertItem->execute([
+        ":school_id" => $schoolId,
+        ":item_name" => (string)$row["item_name"],
+        ":quantity" => (int)$row["quantity"],
+        ":item_condition" => (string)$row["item_condition"],
+        ":remarks" => (string)$row["remarks"],
+        ":updated_at" => $now,
+      ]);
+    }
+
+    $pdo->prepare("
+      INSERT INTO import_logs (school_id, file_name, row_count, imported_at)
+      VALUES (:school_id, :file_name, :row_count, :imported_at)
+    ")->execute([
+      ":school_id" => $schoolId,
+      ":file_name" => "restored_" . (string)$log["file_name"],
+      ":row_count" => count($snapshotRows),
+      ":imported_at" => $now,
+    ]);
+
+    $pdo->prepare("UPDATE deleted_logs SET restored_at = :restored_at WHERE id = :id")
+      ->execute([
+        ":restored_at" => $now,
+        ":id" => $deletedLogId,
+      ]);
+
+    $pdo->commit();
+    json_response(["ok" => true, "message" => "Deleted inventory restored.", "rows" => count($snapshotRows)]);
   }
 
   if ($action === "admin_users") {
