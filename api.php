@@ -65,6 +65,7 @@ function db(): PDO {
       quantity INTEGER NOT NULL DEFAULT 0,
       item_condition TEXT NOT NULL,
       remarks TEXT NOT NULL,
+      raw_json TEXT,
       updated_at TEXT NOT NULL
     );
   ");
@@ -99,12 +100,21 @@ function db(): PDO {
       quantity INTEGER NOT NULL DEFAULT 0,
       item_condition TEXT NOT NULL,
       remarks TEXT NOT NULL,
+      raw_json TEXT,
       deleted_at TEXT NOT NULL
     );
   ");
 
   try {
     $pdo->exec("ALTER TABLE deleted_logs ADD COLUMN restored_at TEXT");
+  } catch (Throwable $ignored) {
+  }
+  try {
+    $pdo->exec("ALTER TABLE inventory_items ADD COLUMN raw_json TEXT");
+  } catch (Throwable $ignored) {
+  }
+  try {
+    $pdo->exec("ALTER TABLE deleted_inventory_items ADD COLUMN raw_json TEXT");
   } catch (Throwable $ignored) {
   }
 
@@ -169,6 +179,19 @@ function read_json_input(): array {
   return is_array($data) ? $data : [];
 }
 
+function normalize_header(string $header, int $index): string {
+  $h = strtolower(trim($header));
+  if ($h === "") {
+    return "col_" . ($index + 1);
+  }
+  $h = preg_replace('/[^a-z0-9]+/', '_', $h);
+  $h = trim((string)$h, '_');
+  if ($h === "") {
+    return "col_" . ($index + 1);
+  }
+  return $h;
+}
+
 function archive_current_inventory(PDO $pdo, string $schoolId, string $fileName, string $timestamp): int {
   $countStmt = $pdo->prepare("SELECT COUNT(*) as total FROM inventory_items WHERE school_id = :school_id");
   $countStmt->execute([":school_id" => $schoolId]);
@@ -191,9 +214,9 @@ function archive_current_inventory(PDO $pdo, string $schoolId, string $fileName,
 
   $snapshotStmt = $pdo->prepare("
     INSERT INTO deleted_inventory_items (
-      deleted_log_id, school_id, item_name, quantity, item_condition, remarks, deleted_at
+      deleted_log_id, school_id, item_name, quantity, item_condition, remarks, raw_json, deleted_at
     )
-    SELECT :deleted_log_id, school_id, item_name, quantity, item_condition, remarks, :deleted_at
+    SELECT :deleted_log_id, school_id, item_name, quantity, item_condition, remarks, raw_json, :deleted_at
     FROM inventory_items
     WHERE school_id = :school_id;
   ");
@@ -212,31 +235,58 @@ function parse_csv_upload(string $content): array {
     throw new RuntimeException("CSV must have headers and at least one data row.");
   }
 
-  $headers = array_map(static fn($h) => strtolower(trim((string)$h)), str_getcsv((string)$lines[0]));
-  $required = ["item_name", "quantity", "condition", "remarks"];
-  foreach ($required as $header) {
-    if (!in_array($header, $headers, true)) {
-      throw new RuntimeException("Missing required header: " . $header);
+  $rawHeaders = str_getcsv((string)$lines[0]);
+  $headers = [];
+  $seen = [];
+  foreach ($rawHeaders as $i => $h) {
+    $base = normalize_header((string)$h, $i);
+    $name = $base;
+    $suffix = 2;
+    while (isset($seen[$name])) {
+      $name = $base . "_" . $suffix;
+      $suffix++;
     }
+    $seen[$name] = true;
+    $headers[] = $name;
   }
 
-  $indexMap = [];
-  foreach ($headers as $i => $h) {
-    $indexMap[$h] = $i;
+  if (!in_array("item", $headers, true) && !in_array("item_name", $headers, true)) {
+    throw new RuntimeException("Missing required header: item or item_name");
   }
 
   $rows = [];
   for ($i = 1; $i < count($lines); $i++) {
     if (trim((string)$lines[$i]) === "") continue;
     $values = str_getcsv((string)$lines[$i]);
-    $row = [
-      "item_name" => trim((string)($values[$indexMap["item_name"]] ?? "")),
-      "quantity" => (int)trim((string)($values[$indexMap["quantity"]] ?? "0")),
-      "condition" => trim((string)($values[$indexMap["condition"]] ?? "")),
-      "remarks" => trim((string)($values[$indexMap["remarks"]] ?? "")),
+    $raw = [];
+    foreach ($headers as $idx => $name) {
+      $raw[$name] = trim((string)($values[$idx] ?? ""));
+    }
+
+    $itemName = trim((string)($raw["item"] ?? $raw["item_name"] ?? ""));
+    if ($itemName === "") continue;
+
+    $quantity = 1;
+    if (isset($raw["quantity"]) && is_numeric($raw["quantity"])) {
+      $q = (int)$raw["quantity"];
+      if ($q > 0) {
+        $quantity = $q;
+      }
+    }
+
+    $condition = trim((string)($raw["erquipment_condition"] ?? $raw["equipment_condition"] ?? $raw["condition"] ?? ""));
+    if ($condition === "") {
+      $condition = "Unknown";
+    }
+    $remarks = trim((string)($raw["remarks"] ?? ""));
+
+    $rows[] = [
+      "item_name" => $itemName,
+      "quantity" => $quantity,
+      "condition" => $condition,
+      "remarks" => $remarks,
+      "raw_json" => json_encode($raw, JSON_UNESCAPED_UNICODE),
     ];
-    if ($row["item_name"] === "") continue;
-    $rows[] = $row;
   }
 
   if (count($rows) === 0) {
@@ -335,8 +385,8 @@ try {
       ->execute([":school_id" => $schoolId]);
 
     $insertItem = $pdo->prepare("
-      INSERT INTO inventory_items (school_id, item_name, quantity, item_condition, remarks, updated_at)
-      VALUES (:school_id, :item_name, :quantity, :item_condition, :remarks, :updated_at);
+      INSERT INTO inventory_items (school_id, item_name, quantity, item_condition, remarks, raw_json, updated_at)
+      VALUES (:school_id, :item_name, :quantity, :item_condition, :remarks, :raw_json, :updated_at);
     ");
 
     foreach ($rows as $row) {
@@ -346,6 +396,7 @@ try {
         ":quantity" => $row["quantity"],
         ":item_condition" => $row["condition"],
         ":remarks" => $row["remarks"],
+        ":raw_json" => $row["raw_json"] ?? null,
         ":updated_at" => $now,
       ]);
     }
@@ -369,7 +420,7 @@ try {
     $user = require_login();
     if (($user["role"] ?? "") === "admin") {
       $stmt = $pdo->query("
-        SELECT i.school_id, s.school_name, i.item_name, i.quantity, i.item_condition, i.remarks
+        SELECT i.school_id, s.school_name, i.item_name, i.quantity, i.item_condition, i.remarks, i.raw_json
         FROM inventory_items i
         JOIN schools s ON s.school_id = i.school_id
         ORDER BY s.school_name ASC, i.item_name ASC;
@@ -377,7 +428,7 @@ try {
       $rows = $stmt->fetchAll();
     } else {
       $stmt = $pdo->prepare("
-        SELECT i.school_id, s.school_name, i.item_name, i.quantity, i.item_condition, i.remarks
+        SELECT i.school_id, s.school_name, i.item_name, i.quantity, i.item_condition, i.remarks, i.raw_json
         FROM inventory_items i
         JOIN schools s ON s.school_id = i.school_id
         WHERE i.school_id = :school_id
@@ -386,6 +437,11 @@ try {
       $stmt->execute([":school_id" => (string)$user["schoolId"]]);
       $rows = $stmt->fetchAll();
     }
+    foreach ($rows as &$row) {
+      $decoded = json_decode((string)($row["raw_json"] ?? ""), true);
+      $row["row_data"] = is_array($decoded) ? $decoded : [];
+    }
+    unset($row);
     json_response(["ok" => true, "rows" => $rows]);
   }
 
@@ -495,7 +551,7 @@ try {
     }
 
     $snapshotStmt = $pdo->prepare("
-      SELECT item_name, quantity, item_condition, remarks
+      SELECT item_name, quantity, item_condition, remarks, raw_json
       FROM deleted_inventory_items
       WHERE deleted_log_id = :deleted_log_id
       ORDER BY id ASC
@@ -515,8 +571,8 @@ try {
       ->execute([":school_id" => $schoolId]);
 
     $insertItem = $pdo->prepare("
-      INSERT INTO inventory_items (school_id, item_name, quantity, item_condition, remarks, updated_at)
-      VALUES (:school_id, :item_name, :quantity, :item_condition, :remarks, :updated_at)
+      INSERT INTO inventory_items (school_id, item_name, quantity, item_condition, remarks, raw_json, updated_at)
+      VALUES (:school_id, :item_name, :quantity, :item_condition, :remarks, :raw_json, :updated_at)
     ");
     foreach ($snapshotRows as $row) {
       $insertItem->execute([
@@ -525,6 +581,7 @@ try {
         ":quantity" => (int)$row["quantity"],
         ":item_condition" => (string)$row["item_condition"],
         ":remarks" => (string)$row["remarks"],
+        ":raw_json" => $row["raw_json"] ?? null,
         ":updated_at" => $now,
       ]);
     }
