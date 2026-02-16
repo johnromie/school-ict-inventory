@@ -218,8 +218,8 @@ input {
 .inventoryTable {
   border-collapse: separate;
   border-spacing: 0;
-  width: 100%;
-  min-width: 760px;
+  width: max-content;
+  min-width: 100%;
 }
 
 .inventoryTable thead th {
