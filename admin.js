@@ -4,7 +4,8 @@ const summaryEl = document.getElementById("summary");
 const messageEl = document.getElementById("message");
 const searchInput = document.getElementById("searchInput");
 const inventoryTableWrap = document.getElementById("inventoryTableWrap");
-const inventorySlider = document.getElementById("inventorySlider");
+const inventoryBottomScroll = document.getElementById("inventoryBottomScroll");
+const inventoryBottomScrollInner = document.getElementById("inventoryBottomScrollInner");
 const inventoryHead = document.getElementById("inventoryHead");
 
 const inventoryBody = document.getElementById("inventoryBody");
@@ -157,14 +158,14 @@ function renderInventory() {
 }
 
 function refreshInventorySlider() {
-  if (!inventoryTableWrap || !inventorySlider) return;
+  if (!inventoryTableWrap || !inventoryBottomScroll || !inventoryBottomScrollInner) return;
   const table = inventoryTableWrap.querySelector(".inventoryTable");
   const tableWidth = table ? table.scrollWidth : inventoryTableWrap.scrollWidth;
   const maxScroll = Math.max(0, tableWidth - inventoryTableWrap.clientWidth);
   requestAnimationFrame(() => {
-    inventorySlider.max = String(maxScroll);
-    inventorySlider.value = String(Math.min(maxScroll, inventoryTableWrap.scrollLeft));
-    inventorySlider.disabled = maxScroll <= 0;
+    inventoryBottomScrollInner.style.width = `${tableWidth}px`;
+    inventoryBottomScroll.scrollLeft = Math.min(maxScroll, inventoryTableWrap.scrollLeft);
+    inventoryBottomScroll.classList.toggle("hidden", maxScroll <= 0);
   });
 }
 
@@ -250,12 +251,13 @@ searchInput.addEventListener("input", (e) => {
   renderInventory();
 });
 
-inventorySlider.addEventListener("input", () => {
-  inventoryTableWrap.scrollLeft = Number(inventorySlider.value || 0);
+inventoryTableWrap.addEventListener("scroll", () => {
+  if (!inventoryBottomScroll) return;
+  inventoryBottomScroll.scrollLeft = inventoryTableWrap.scrollLeft;
 });
 
-inventoryTableWrap.addEventListener("scroll", () => {
-  inventorySlider.value = String(Math.floor(inventoryTableWrap.scrollLeft));
+inventoryBottomScroll.addEventListener("scroll", () => {
+  inventoryTableWrap.scrollLeft = inventoryBottomScroll.scrollLeft;
 });
 
 window.addEventListener("resize", refreshInventorySlider);

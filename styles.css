@@ -181,27 +181,38 @@ input {
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
-  overflow-y: auto;
+  overflow-y: visible;
+  scrollbar-width: none;
 }
 
-.tableSliderRow {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  margin: 0 0 8px;
+.tableWrap::-webkit-scrollbar {
+  height: 0;
 }
 
-.tableSliderBottom {
-  margin: 8px 0 0;
+.tableBottomScroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin-top: 6px;
+  padding-bottom: 2px;
 }
 
-.tableSliderRow input[type="range"] {
-  width: min(560px, 100%);
-  max-width: 100%;
+.tableBottomScrollInner {
+  height: 1px;
 }
 
-.tableSliderRow .hint {
-  display: none;
+.tableBottomScroll::-webkit-scrollbar {
+  height: 10px;
+}
+
+.tableBottomScroll::-webkit-scrollbar-track {
+  background: #dbe5f3;
+  border-radius: 999px;
+}
+
+.tableBottomScroll::-webkit-scrollbar-thumb {
+  background: #7ea2d7;
+  border-radius: 999px;
 }
 
 .inventoryTable {
