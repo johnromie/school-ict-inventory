@@ -187,13 +187,17 @@ input {
 .tableSliderRow {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: flex-start;
   margin: 0 0 8px;
 }
 
 .tableSliderRow input[type="range"] {
-  width: 260px;
+  width: min(420px, 100%);
   max-width: 100%;
+}
+
+.tableSliderRow .hint {
+  display: none;
 }
 
 .inventoryTable {
