@@ -191,8 +191,12 @@ input {
   margin: 0 0 8px;
 }
 
+.tableSliderBottom {
+  margin: 8px 0 0;
+}
+
 .tableSliderRow input[type="range"] {
-  width: min(420px, 100%);
+  width: min(560px, 100%);
   max-width: 100%;
 }
 

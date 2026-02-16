@@ -118,6 +118,7 @@ function renderInventory() {
 
   if (!filtered.length) {
     inventoryBody.innerHTML = `<tr><td colspan="${INVENTORY_COLUMNS.length}" class="empty">No records found.</td></tr>`;
+    refreshInventorySlider();
     return;
   }
 
@@ -141,10 +142,14 @@ function renderInventory() {
 
 function refreshInventorySlider() {
   if (!inventoryTableWrap || !inventorySlider) return;
-  const maxScroll = Math.max(0, inventoryTableWrap.scrollWidth - inventoryTableWrap.clientWidth);
-  inventorySlider.max = String(maxScroll);
-  inventorySlider.value = String(Math.min(maxScroll, inventoryTableWrap.scrollLeft));
-  inventorySlider.disabled = maxScroll <= 0;
+  const table = inventoryTableWrap.querySelector(".inventoryTable");
+  const tableWidth = table ? table.scrollWidth : inventoryTableWrap.scrollWidth;
+  const maxScroll = Math.max(0, tableWidth - inventoryTableWrap.clientWidth);
+  requestAnimationFrame(() => {
+    inventorySlider.max = String(maxScroll);
+    inventorySlider.value = String(Math.min(maxScroll, inventoryTableWrap.scrollLeft));
+    inventorySlider.disabled = maxScroll <= 0;
+  });
 }
 
 function renderImports() {
