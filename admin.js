@@ -3,6 +3,8 @@ const activeSchoolBadge = document.getElementById("activeSchoolBadge");
 const summaryEl = document.getElementById("summary");
 const messageEl = document.getElementById("message");
 const searchInput = document.getElementById("searchInput");
+const inventoryTableWrap = document.getElementById("inventoryTableWrap");
+const inventorySlider = document.getElementById("inventorySlider");
 const inventoryHead = document.getElementById("inventoryHead");
 
 const inventoryBody = document.getElementById("inventoryBody");
@@ -149,6 +151,16 @@ function renderInventory() {
       }).join("")}
     </tr>
   `).join("");
+
+  refreshInventorySlider();
+}
+
+function refreshInventorySlider() {
+  if (!inventoryTableWrap || !inventorySlider) return;
+  const maxScroll = Math.max(0, inventoryTableWrap.scrollWidth - inventoryTableWrap.clientWidth);
+  inventorySlider.max = String(maxScroll);
+  inventorySlider.value = String(Math.min(maxScroll, inventoryTableWrap.scrollLeft));
+  inventorySlider.disabled = maxScroll <= 0;
 }
 
 function renderImports() {
@@ -232,6 +244,16 @@ searchInput.addEventListener("input", (e) => {
   searchTerm = e.target.value.trim().toLowerCase();
   renderInventory();
 });
+
+inventorySlider.addEventListener("input", () => {
+  inventoryTableWrap.scrollLeft = Number(inventorySlider.value || 0);
+});
+
+inventoryTableWrap.addEventListener("scroll", () => {
+  inventorySlider.value = String(Math.floor(inventoryTableWrap.scrollLeft));
+});
+
+window.addEventListener("resize", refreshInventorySlider);
 
 logoutBtn.addEventListener("click", async () => {
   try {
