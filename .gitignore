@@ -2,3 +2,4 @@ data/*.sqlite
 data/*.sqlite-*
 .DS_Store
 Thumbs.db
+render-deploy-hook.url
