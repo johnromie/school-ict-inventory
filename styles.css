@@ -182,20 +182,36 @@ input {
   max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.tableWrap::-webkit-scrollbar {
+  height: 0;
+}
+
+.tableBottomBar {
+  margin-top: 6px;
+  width: 100%;
+  overflow-x: scroll;
+  overflow-y: hidden;
   scrollbar-width: thin;
   scrollbar-color: #7ea2d7 #dbe5f3;
 }
 
-.tableWrap::-webkit-scrollbar {
+.tableBottomBarInner {
+  height: 1px;
+}
+
+.tableBottomBar::-webkit-scrollbar {
   height: 10px;
 }
 
-.tableWrap::-webkit-scrollbar-track {
+.tableBottomBar::-webkit-scrollbar-track {
   background: #dbe5f3;
   border-radius: 999px;
 }
 
-.tableWrap::-webkit-scrollbar-thumb {
+.tableBottomBar::-webkit-scrollbar-thumb {
   background: #7ea2d7;
   border-radius: 999px;
 }

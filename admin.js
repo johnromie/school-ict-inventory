@@ -4,6 +4,8 @@ const summaryEl = document.getElementById("summary");
 const messageEl = document.getElementById("message");
 const searchInput = document.getElementById("searchInput");
 const inventoryTableWrap = document.getElementById("inventoryTableWrap");
+const inventoryBottomBar = document.getElementById("inventoryBottomBar");
+const inventoryBottomBarInner = document.getElementById("inventoryBottomBarInner");
 const inventoryHead = document.getElementById("inventoryHead");
 
 const inventoryBody = document.getElementById("inventoryBody");
@@ -156,8 +158,13 @@ function renderInventory() {
 }
 
 function refreshInventorySlider() {
-  if (!inventoryTableWrap) return;
-  inventoryTableWrap.scrollLeft = Math.min(inventoryTableWrap.scrollLeft, Math.max(0, inventoryTableWrap.scrollWidth - inventoryTableWrap.clientWidth));
+  if (!inventoryTableWrap || !inventoryBottomBar || !inventoryBottomBarInner) return;
+  const table = inventoryTableWrap.querySelector(".inventoryTable");
+  const tableWidth = table ? table.scrollWidth : inventoryTableWrap.scrollWidth;
+  const maxScroll = Math.max(0, tableWidth - inventoryTableWrap.clientWidth);
+  inventoryBottomBarInner.style.width = `${Math.max(tableWidth, inventoryTableWrap.clientWidth + 1)}px`;
+  inventoryTableWrap.scrollLeft = Math.min(inventoryTableWrap.scrollLeft, maxScroll);
+  inventoryBottomBar.scrollLeft = inventoryTableWrap.scrollLeft;
 }
 
 function renderImports() {
@@ -243,7 +250,12 @@ searchInput.addEventListener("input", (e) => {
 });
 
 inventoryTableWrap.addEventListener("scroll", () => {
-  refreshInventorySlider();
+  if (!inventoryBottomBar) return;
+  inventoryBottomBar.scrollLeft = inventoryTableWrap.scrollLeft;
+});
+
+inventoryBottomBar.addEventListener("scroll", () => {
+  inventoryTableWrap.scrollLeft = inventoryBottomBar.scrollLeft;
 });
 
 window.addEventListener("resize", refreshInventorySlider);
