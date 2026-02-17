@@ -144,11 +144,24 @@ function renderInventory() {
 function refreshInventorySlider() {
   if (!inventoryTableWrap || !inventoryBottomBar || !inventoryBottomBarInner) return;
   const table = inventoryTableWrap.querySelector(".inventoryTable");
-  const tableWidth = table ? table.scrollWidth : inventoryTableWrap.scrollWidth;
-  const maxScroll = Math.max(0, tableWidth - inventoryTableWrap.clientWidth);
-  inventoryBottomBarInner.style.width = `${Math.max(tableWidth, inventoryTableWrap.clientWidth + 1)}px`;
-  inventoryTableWrap.scrollLeft = Math.min(inventoryTableWrap.scrollLeft, maxScroll);
-  inventoryBottomBar.scrollLeft = inventoryTableWrap.scrollLeft;
+  const measureWidth = () => {
+    if (!table) return inventoryTableWrap.clientWidth;
+    const baseWidth = Math.max(table.scrollWidth, table.offsetWidth);
+    const headerCells = table.querySelectorAll("thead th");
+    if (!headerCells.length) return baseWidth;
+    const headerWidth = Array.from(headerCells).reduce((sum, cell) => sum + cell.getBoundingClientRect().width, 0);
+    return Math.max(baseWidth, Math.ceil(headerWidth));
+  };
+
+  requestAnimationFrame(() => {
+    const tableWidth = measureWidth();
+    const maxScroll = Math.max(0, tableWidth - inventoryTableWrap.clientWidth);
+    inventoryBottomBarInner.style.width = `${Math.max(tableWidth, inventoryTableWrap.clientWidth + 1)}px`;
+    inventoryTableWrap.scrollLeft = Math.min(inventoryTableWrap.scrollLeft, maxScroll);
+    if (Math.abs(inventoryBottomBar.scrollLeft - inventoryTableWrap.scrollLeft) > 1) {
+      inventoryBottomBar.scrollLeft = inventoryTableWrap.scrollLeft;
+    }
+  });
 }
 
 function renderImports() {
@@ -306,11 +319,15 @@ searchInput.addEventListener("input", (e) => {
 
 inventoryTableWrap.addEventListener("scroll", () => {
   if (!inventoryBottomBar) return;
-  inventoryBottomBar.scrollLeft = inventoryTableWrap.scrollLeft;
+  if (Math.abs(inventoryBottomBar.scrollLeft - inventoryTableWrap.scrollLeft) > 1) {
+    inventoryBottomBar.scrollLeft = inventoryTableWrap.scrollLeft;
+  }
 });
 
 inventoryBottomBar.addEventListener("scroll", () => {
-  inventoryTableWrap.scrollLeft = inventoryBottomBar.scrollLeft;
+  if (Math.abs(inventoryTableWrap.scrollLeft - inventoryBottomBar.scrollLeft) > 1) {
+    inventoryTableWrap.scrollLeft = inventoryBottomBar.scrollLeft;
+  }
 });
 
 window.addEventListener("resize", refreshInventorySlider);
