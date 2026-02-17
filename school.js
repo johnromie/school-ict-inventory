@@ -105,7 +105,7 @@ function switchView(view) {
 
 function renderInventory() {
   const tableEl = inventoryTableWrap?.querySelector(".inventoryTable");
-  const forcedMinWidth = INVENTORY_COLUMNS.length * 170;
+  const forcedMinWidth = INVENTORY_COLUMNS.length * 240;
   if (tableEl) {
     tableEl.style.minWidth = `${forcedMinWidth}px`;
   }
