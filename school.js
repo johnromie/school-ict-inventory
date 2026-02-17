@@ -106,6 +106,12 @@ function switchView(view) {
 }
 
 function renderInventory() {
+  const tableEl = inventoryTableWrap?.querySelector(".inventoryTable");
+  const forcedMinWidth = INVENTORY_COLUMNS.length * 170;
+  if (tableEl) {
+    tableEl.style.minWidth = `${forcedMinWidth}px`;
+  }
+
   inventoryHead.innerHTML = `<tr>${INVENTORY_COLUMNS.map((c) => `<th>${c.label}</th>`).join("")}</tr>`;
 
   const filtered = inventoryRows.filter((row) => {
@@ -144,6 +150,7 @@ function renderInventory() {
 function refreshInventorySlider() {
   if (!inventoryTableWrap || !inventoryBottomBar || !inventoryBottomBarInner) return;
   const table = inventoryTableWrap.querySelector(".inventoryTable");
+  const forcedMinWidth = INVENTORY_COLUMNS.length * 170;
   const measureWidth = () => {
     if (!table) return inventoryTableWrap.clientWidth;
     const baseWidth = Math.max(table.scrollWidth, table.offsetWidth);
@@ -154,13 +161,11 @@ function refreshInventorySlider() {
   };
 
   requestAnimationFrame(() => {
-    const tableWidth = measureWidth();
+    const tableWidth = Math.max(measureWidth(), forcedMinWidth);
     const maxScroll = Math.max(0, tableWidth - inventoryTableWrap.clientWidth);
     inventoryBottomBarInner.style.width = `${Math.max(tableWidth, inventoryTableWrap.clientWidth + 1)}px`;
     inventoryTableWrap.scrollLeft = Math.min(inventoryTableWrap.scrollLeft, maxScroll);
-    if (Math.abs(inventoryBottomBar.scrollLeft - inventoryTableWrap.scrollLeft) > 1) {
-      inventoryBottomBar.scrollLeft = inventoryTableWrap.scrollLeft;
-    }
+    inventoryBottomBar.scrollLeft = inventoryTableWrap.scrollLeft;
   });
 }
 
@@ -319,15 +324,11 @@ searchInput.addEventListener("input", (e) => {
 
 inventoryTableWrap.addEventListener("scroll", () => {
   if (!inventoryBottomBar) return;
-  if (Math.abs(inventoryBottomBar.scrollLeft - inventoryTableWrap.scrollLeft) > 1) {
-    inventoryBottomBar.scrollLeft = inventoryTableWrap.scrollLeft;
-  }
+  inventoryBottomBar.scrollLeft = inventoryTableWrap.scrollLeft;
 });
 
 inventoryBottomBar.addEventListener("scroll", () => {
-  if (Math.abs(inventoryTableWrap.scrollLeft - inventoryBottomBar.scrollLeft) > 1) {
-    inventoryTableWrap.scrollLeft = inventoryBottomBar.scrollLeft;
-  }
+  inventoryTableWrap.scrollLeft = inventoryBottomBar.scrollLeft;
 });
 
 window.addEventListener("resize", refreshInventorySlider);
