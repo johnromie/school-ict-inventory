@@ -8,6 +8,7 @@ const messageEl = document.getElementById("message");
 const summaryEl = document.getElementById("summary");
 const searchInput = document.getElementById("searchInput");
 const inventoryTableWrap = document.getElementById("inventoryTableWrap");
+const inventorySlider = document.getElementById("inventorySlider");
 const inventoryHead = document.getElementById("inventoryHead");
 const inventoryBody = document.getElementById("inventoryBody");
 const importsBody = document.getElementById("importsBody");
@@ -146,9 +147,12 @@ function renderInventory() {
 }
 
 function refreshInventorySlider() {
-  if (!inventoryTableWrap) return;
+  if (!inventoryTableWrap || !inventorySlider) return;
   const maxScroll = Math.max(0, inventoryTableWrap.scrollWidth - inventoryTableWrap.clientWidth);
   inventoryTableWrap.scrollLeft = Math.min(inventoryTableWrap.scrollLeft, maxScroll);
+  inventorySlider.max = String(maxScroll);
+  inventorySlider.value = String(Math.min(maxScroll, inventoryTableWrap.scrollLeft));
+  inventorySlider.disabled = maxScroll <= 0;
 }
 
 function renderImports() {
@@ -305,6 +309,9 @@ searchInput.addEventListener("input", (e) => {
 });
 
 inventoryTableWrap.addEventListener("scroll", refreshInventorySlider);
+inventorySlider.addEventListener("input", () => {
+  inventoryTableWrap.scrollLeft = Number(inventorySlider.value || 0);
+});
 
 window.addEventListener("resize", refreshInventorySlider);
 

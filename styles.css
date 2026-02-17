@@ -186,6 +186,16 @@ input {
   scrollbar-color: #7ea2d7 #dbe5f3;
 }
 
+.tableSliderRow {
+  display: flex;
+  align-items: center;
+  margin: 0 0 8px;
+}
+
+.tableSliderRow input[type="range"] {
+  width: min(560px, 100%);
+}
+
 .tableWrap::-webkit-scrollbar {
   height: 10px;
 }
