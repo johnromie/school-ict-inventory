@@ -232,6 +232,7 @@ input {
   padding: 8px 7px;
   font-size: 0.8rem;
   white-space: nowrap;
+  min-width: 130px;
 }
 
 .inventoryTable td {
@@ -240,6 +241,7 @@ input {
   font-size: 0.8rem;
   background: #f8fafc;
   white-space: nowrap;
+  min-width: 130px;
 }
 
 .inventoryTable tr:nth-child(even) td {
