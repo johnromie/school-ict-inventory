@@ -180,38 +180,22 @@ input {
 .tableWrap {
   width: 100%;
   max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-}
-
-.tableWrap::-webkit-scrollbar {
-  height: 0;
-}
-
-.tableBottomBar {
-  margin-top: 6px;
-  width: 100%;
   overflow-x: scroll;
   overflow-y: hidden;
   scrollbar-width: thin;
   scrollbar-color: #7ea2d7 #dbe5f3;
 }
 
-.tableBottomBarInner {
-  height: 1px;
-}
-
-.tableBottomBar::-webkit-scrollbar {
+.tableWrap::-webkit-scrollbar {
   height: 10px;
 }
 
-.tableBottomBar::-webkit-scrollbar-track {
+.tableWrap::-webkit-scrollbar-track {
   background: #dbe5f3;
   border-radius: 999px;
 }
 
-.tableBottomBar::-webkit-scrollbar-thumb {
+.tableWrap::-webkit-scrollbar-thumb {
   background: #7ea2d7;
   border-radius: 999px;
 }

@@ -4,8 +4,6 @@ const summaryEl = document.getElementById("summary");
 const messageEl = document.getElementById("message");
 const searchInput = document.getElementById("searchInput");
 const inventoryTableWrap = document.getElementById("inventoryTableWrap");
-const inventoryBottomBar = document.getElementById("inventoryBottomBar");
-const inventoryBottomBarInner = document.getElementById("inventoryBottomBarInner");
 const inventoryHead = document.getElementById("inventoryHead");
 
 const inventoryBody = document.getElementById("inventoryBody");
@@ -164,25 +162,9 @@ function renderInventory() {
 }
 
 function refreshInventorySlider() {
-  if (!inventoryTableWrap || !inventoryBottomBar || !inventoryBottomBarInner) return;
-  const table = inventoryTableWrap.querySelector(".inventoryTable");
-  const forcedMinWidth = INVENTORY_COLUMNS.length * 170;
-  const measureWidth = () => {
-    if (!table) return inventoryTableWrap.clientWidth;
-    const baseWidth = Math.max(table.scrollWidth, table.offsetWidth);
-    const headerCells = table.querySelectorAll("thead th");
-    if (!headerCells.length) return baseWidth;
-    const headerWidth = Array.from(headerCells).reduce((sum, cell) => sum + cell.getBoundingClientRect().width, 0);
-    return Math.max(baseWidth, Math.ceil(headerWidth));
-  };
-
-  requestAnimationFrame(() => {
-    const tableWidth = Math.max(measureWidth(), forcedMinWidth);
-    const maxScroll = Math.max(0, tableWidth - inventoryTableWrap.clientWidth);
-    inventoryBottomBarInner.style.width = `${Math.max(tableWidth, inventoryTableWrap.clientWidth + 1)}px`;
-    inventoryTableWrap.scrollLeft = Math.min(inventoryTableWrap.scrollLeft, maxScroll);
-    inventoryBottomBar.scrollLeft = inventoryTableWrap.scrollLeft;
-  });
+  if (!inventoryTableWrap) return;
+  const maxScroll = Math.max(0, inventoryTableWrap.scrollWidth - inventoryTableWrap.clientWidth);
+  inventoryTableWrap.scrollLeft = Math.min(inventoryTableWrap.scrollLeft, maxScroll);
 }
 
 function renderImports() {
@@ -267,14 +249,7 @@ searchInput.addEventListener("input", (e) => {
   renderInventory();
 });
 
-inventoryTableWrap.addEventListener("scroll", () => {
-  if (!inventoryBottomBar) return;
-  inventoryBottomBar.scrollLeft = inventoryTableWrap.scrollLeft;
-});
-
-inventoryBottomBar.addEventListener("scroll", () => {
-  inventoryTableWrap.scrollLeft = inventoryBottomBar.scrollLeft;
-});
+inventoryTableWrap.addEventListener("scroll", refreshInventorySlider);
 
 window.addEventListener("resize", refreshInventorySlider);
 
