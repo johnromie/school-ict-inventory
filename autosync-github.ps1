@@ -1,7 +1,6 @@
 param(
   [string]$RepoPath = $PSScriptRoot,
-  [int]$DebounceSeconds = 4,
-  [string]$RenderDeployHookUrl = ""
+  [int]$DebounceSeconds = 4
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,10 +12,7 @@ function Write-Log {
 }
 
 function Invoke-GitSync {
-  param(
-    [string]$Path,
-    [string]$DeployHookUrl
-  )
+  param([string]$Path)
 
   Push-Location $Path
   try {
@@ -32,16 +28,6 @@ function Invoke-GitSync {
     git push origin HEAD | Out-Null
 
     Write-Log "Synced to GitHub."
-
-    if (-not [string]::IsNullOrWhiteSpace($DeployHookUrl)) {
-      try {
-        $resp = Invoke-WebRequest -UseBasicParsing -Method Post -Uri $DeployHookUrl -TimeoutSec 30
-        Write-Log "Render deploy hook triggered. HTTP $($resp.StatusCode)."
-      }
-      catch {
-        Write-Log "Render deploy hook failed: $($_.Exception.Message)"
-      }
-    }
   }
   catch {
     Write-Log "Sync failed: $($_.Exception.Message)"
@@ -63,11 +49,6 @@ Write-Log "Git autosync started."
 Write-Log "Repo: $RepoPath"
 Write-Log "Branch: $branch"
 Write-Log "Debounce: $DebounceSeconds second(s)"
-if (-not [string]::IsNullOrWhiteSpace($RenderDeployHookUrl)) {
-  Write-Log "Render deploy hook: configured"
-} else {
-  Write-Log "Render deploy hook: not configured"
-}
 Write-Log "Press Ctrl+C to stop."
 
 $watcher = New-Object System.IO.FileSystemWatcher
@@ -103,10 +84,10 @@ try {
     Start-Sleep -Seconds 1
 
     if ($script:pending) {
-        $elapsed = (Get-Date) - $script:lastChange
+      $elapsed = (Get-Date) - $script:lastChange
       if ($elapsed.TotalSeconds -ge $DebounceSeconds) {
         $script:pending = $false
-        Invoke-GitSync -Path $RepoPath -DeployHookUrl $RenderDeployHookUrl
+        Invoke-GitSync -Path $RepoPath
       }
     }
   }

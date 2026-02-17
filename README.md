@@ -22,16 +22,6 @@ Notes:
 - Requires git repo + GitHub remote + logged-in git credentials.
 - Uses commit message format: `auto-sync: YYYY-MM-DD HH:mm:ss`.
 
-### Deploy Hook Fallback (optional)
-If Render auto-deploy misses a push, this fallback can trigger deploy automatically after every autosync push.
-
-1. In Render service settings, create a **Deploy Hook** URL.
-2. Create file `render-deploy-hook.url` in project root.
-3. Paste the Deploy Hook URL as the only line in that file.
-4. Run `start-github-autosync.bat`.
-
-Reference template: `render-deploy-hook.url.example`
-
 ## Deploy on Render (works on any network)
 1. Push this project to GitHub.
 2. In Render, click `New +` -> `Blueprint`.
