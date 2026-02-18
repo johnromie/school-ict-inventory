@@ -9,7 +9,6 @@ const summaryEl = document.getElementById("summary");
 const searchInput = document.getElementById("searchInput");
 const deleteAllInventoryBtn = document.getElementById("deleteAllInventoryBtn");
 const inventoryTableWrap = document.getElementById("inventoryTableWrap");
-const inventorySlider = document.getElementById("inventorySlider");
 const inventoryHead = document.getElementById("inventoryHead");
 const inventoryBody = document.getElementById("inventoryBody");
 const importsBody = document.getElementById("importsBody");
@@ -96,7 +95,7 @@ function switchView(view) {
 function renderInventory() {
   const tableEl = inventoryTableWrap?.querySelector(".inventoryTable");
   const wrapWidth = inventoryTableWrap?.clientWidth || 0;
-  const forcedMinWidth = Math.max(INVENTORY_COLUMNS.length * 240, wrapWidth + 800);
+  const forcedMinWidth = Math.max(INVENTORY_COLUMNS.length * 260, Math.floor(wrapWidth * 1.8));
   if (tableEl) {
     tableEl.style.minWidth = `${forcedMinWidth}px`;
     tableEl.style.width = `${forcedMinWidth}px`;
@@ -115,7 +114,7 @@ function renderInventory() {
 
   if (!filtered.length) {
     inventoryBody.innerHTML = `<tr><td colspan="${INVENTORY_COLUMNS.length}" class="empty">No records found.</td></tr>`;
-    requestAnimationFrame(refreshInventorySlider);
+    requestAnimationFrame(refreshInventoryScroll);
     return;
   }
 
@@ -134,20 +133,15 @@ function renderInventory() {
     </tr>
   `).join("");
 
-  requestAnimationFrame(refreshInventorySlider);
+  requestAnimationFrame(refreshInventoryScroll);
 }
 
-function refreshInventorySlider() {
+function refreshInventoryScroll() {
   if (!inventoryTableWrap) return;
   const tableEl = inventoryTableWrap.querySelector(".inventoryTable");
   const tableWidth = tableEl ? tableEl.scrollWidth : inventoryTableWrap.scrollWidth;
   const maxScroll = Math.max(0, tableWidth - inventoryTableWrap.clientWidth);
   inventoryTableWrap.scrollLeft = Math.min(inventoryTableWrap.scrollLeft, maxScroll);
-  if (inventorySlider) {
-    inventorySlider.max = String(maxScroll);
-    inventorySlider.value = String(Math.min(maxScroll, inventoryTableWrap.scrollLeft));
-    inventorySlider.disabled = maxScroll <= 0;
-  }
 }
 
 function renderImports() {
@@ -303,15 +297,10 @@ searchInput.addEventListener("input", (e) => {
   renderInventory();
 });
 
-inventoryTableWrap.addEventListener("scroll", refreshInventorySlider);
-if (inventorySlider) {
-  inventorySlider.addEventListener("input", () => {
-    inventoryTableWrap.scrollLeft = Number(inventorySlider.value || 0);
-  });
-}
+inventoryTableWrap.addEventListener("scroll", refreshInventoryScroll);
 
-window.addEventListener("resize", refreshInventorySlider);
-window.addEventListener("load", refreshInventorySlider);
+window.addEventListener("resize", refreshInventoryScroll);
+window.addEventListener("load", refreshInventoryScroll);
 
 clearDeletedBtn.addEventListener("click", async () => {
   try {

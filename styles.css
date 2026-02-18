@@ -148,6 +148,11 @@ input {
   align-items: center;
 }
 
+#toolsPanel #searchInput {
+  min-width: 260px;
+  width: 320px;
+}
+
 .panelHead {
   display: flex;
   gap: 8px;
@@ -207,9 +212,7 @@ input {
 }
 
 .tableSliderRow {
-  display: flex;
-  align-items: center;
-  margin: 0 0 8px;
+  display: none;
 }
 
 .tableSliderRow input[type="range"] {
