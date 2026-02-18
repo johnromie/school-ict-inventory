@@ -9,6 +9,8 @@ const summaryEl = document.getElementById("summary");
 const searchInput = document.getElementById("searchInput");
 const deleteAllInventoryBtn = document.getElementById("deleteAllInventoryBtn");
 const inventoryTableWrap = document.getElementById("inventoryTableWrap");
+const inventoryHScroll = document.getElementById("inventoryHScroll");
+const inventoryHScrollInner = document.getElementById("inventoryHScrollInner");
 const inventoryHead = document.getElementById("inventoryHead");
 const inventoryBody = document.getElementById("inventoryBody");
 const importsBody = document.getElementById("importsBody");
@@ -22,6 +24,7 @@ let activeSession = null;
 let inventoryRows = [];
 let importRows = [];
 let deletedRows = [];
+let syncingScroll = false;
 
 const INVENTORY_COLUMNS = [
   { key: "property_no", label: "Property No" },
@@ -142,6 +145,12 @@ function refreshInventoryScroll() {
   const tableWidth = tableEl ? tableEl.scrollWidth : inventoryTableWrap.scrollWidth;
   const maxScroll = Math.max(0, tableWidth - inventoryTableWrap.clientWidth);
   inventoryTableWrap.scrollLeft = Math.min(inventoryTableWrap.scrollLeft, maxScroll);
+
+  if (inventoryHScroll && inventoryHScrollInner) {
+    inventoryHScrollInner.style.width = `${tableWidth}px`;
+    inventoryHScroll.scrollLeft = Math.min(inventoryTableWrap.scrollLeft, maxScroll);
+    inventoryHScroll.style.display = maxScroll > 0 ? "block" : "none";
+  }
 }
 
 function renderImports() {
@@ -297,7 +306,26 @@ searchInput.addEventListener("input", (e) => {
   renderInventory();
 });
 
-inventoryTableWrap.addEventListener("scroll", refreshInventoryScroll);
+inventoryTableWrap.addEventListener("scroll", () => {
+  if (syncingScroll) return;
+  const tableEl = inventoryTableWrap.querySelector(".inventoryTable");
+  const tableWidth = tableEl ? tableEl.scrollWidth : inventoryTableWrap.scrollWidth;
+  const maxScroll = Math.max(0, tableWidth - inventoryTableWrap.clientWidth);
+  syncingScroll = true;
+  if (inventoryHScroll) {
+    inventoryHScroll.scrollLeft = Math.min(inventoryTableWrap.scrollLeft, maxScroll);
+  }
+  syncingScroll = false;
+});
+
+if (inventoryHScroll) {
+  inventoryHScroll.addEventListener("scroll", () => {
+    if (syncingScroll) return;
+    syncingScroll = true;
+    inventoryTableWrap.scrollLeft = inventoryHScroll.scrollLeft;
+    syncingScroll = false;
+  });
+}
 
 window.addEventListener("resize", refreshInventoryScroll);
 window.addEventListener("load", refreshInventoryScroll);

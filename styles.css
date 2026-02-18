@@ -211,6 +211,34 @@ input {
   scrollbar-color: #7ea2d7 #dbe5f3;
 }
 
+.hScroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 16px;
+  margin-top: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: #5f89c8 #dbe5f3;
+}
+
+.hScroll > div {
+  height: 1px;
+}
+
+.hScroll::-webkit-scrollbar {
+  height: 12px;
+}
+
+.hScroll::-webkit-scrollbar-track {
+  background: #dbe5f3;
+  border-radius: 999px;
+}
+
+.hScroll::-webkit-scrollbar-thumb {
+  background: #5f89c8;
+  border-radius: 999px;
+}
+
 .tableSliderRow {
   display: none;
 }
