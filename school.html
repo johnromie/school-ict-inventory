@@ -44,10 +44,13 @@
       <section id="inventoryView" class="panel viewPanel">
         <div class="panelHead">
           <h2>Inventory List</h2>
-          <input id="searchInput" type="search" placeholder="Search item, condition, remarks..." />
+          <div class="panelHeadActions">
+            <input id="searchInput" type="search" placeholder="Search item, condition, remarks..." />
+            <button id="deleteAllInventoryBtn" class="btn danger" type="button">Delete All</button>
+          </div>
         </div>
         <div class="tableSliderRow">
-          <input id="inventorySlider" type="range" min="0" max="0" value="0" />
+          <input id="inventorySlider" type="range" min="0" max="0" value="0" step="1" />
         </div>
         <div class="tableWrap" id="inventoryTableWrap">
           <table class="inventoryTable">

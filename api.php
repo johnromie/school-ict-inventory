@@ -18,7 +18,11 @@ const REGISTERED_SCHOOLS = [
 ];
 
 function json_response(array $payload, int $code = 200): void {
-  http_response_code($code);
+  $effectiveCode = $code >= 400 ? 200 : $code;
+  if ($code >= 400 && !array_key_exists("status_code", $payload)) {
+    $payload["status_code"] = $code;
+  }
+  http_response_code($effectiveCode);
   echo json_encode($payload);
   exit;
 }
@@ -521,6 +525,28 @@ try {
     $stmt->execute([":school_id" => $schoolId]);
     $pdo->commit();
     json_response(["ok" => true, "message" => "Deleted logs cleared."]);
+  }
+
+  if ($action === "delete_all_inventory") {
+    $user = require_login();
+    if (($user["role"] ?? "") !== "school") {
+      json_response(["ok" => false, "message" => "Only school accounts can delete inventory."], 403);
+    }
+
+    $schoolId = (string)$user["schoolId"];
+    $now = (new DateTimeImmutable("now"))->format(DateTimeInterface::ATOM);
+    $pdo->beginTransaction();
+
+    $archived = archive_current_inventory($pdo, $schoolId, "manual_delete_all.csv", $now);
+    $stmt = $pdo->prepare("DELETE FROM inventory_items WHERE school_id = :school_id");
+    $stmt->execute([":school_id" => $schoolId]);
+    $deletedCount = (int)$stmt->rowCount();
+
+    $pdo->commit();
+    if ($deletedCount <= 0) {
+      json_response(["ok" => true, "message" => "No inventory records to delete.", "rows" => 0, "archived" => $archived]);
+    }
+    json_response(["ok" => true, "message" => "All inventory records deleted.", "rows" => $deletedCount, "archived" => $archived]);
   }
 
   if ($action === "restore_deleted") {

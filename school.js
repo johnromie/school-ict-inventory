@@ -7,6 +7,7 @@ const csvFileInput = document.getElementById("csvFile");
 const messageEl = document.getElementById("message");
 const summaryEl = document.getElementById("summary");
 const searchInput = document.getElementById("searchInput");
+const deleteAllInventoryBtn = document.getElementById("deleteAllInventoryBtn");
 const inventoryTableWrap = document.getElementById("inventoryTableWrap");
 const inventorySlider = document.getElementById("inventorySlider");
 const inventoryHead = document.getElementById("inventoryHead");
@@ -24,50 +25,24 @@ let importRows = [];
 let deletedRows = [];
 
 const INVENTORY_COLUMNS = [
-  { key: "property_no", label: "Property No." },
-  { key: "old_previous_property_no", label: "Old / Previous Property No." },
-  { key: "serial_number", label: "Serial Number" },
+  { key: "property_no", label: "Property No" },
   { key: "item", label: "Item" },
-  { key: "uom", label: "Unit of Measure" },
-  { key: "brand_manufacturer", label: "Brand / Manufacturer" },
-  { key: "model", label: "Model" },
-  { key: "specifications", label: "Specification(s)" },
-  { key: "non_dcp", label: "Non-DCP" },
-  { key: "dcp_package", label: "DCP Package" },
-  { key: "dcp_year", label: "DCP Year Package" },
   { key: "category", label: "Category" },
-  { key: "classification", label: "Classification" },
-  { key: "gl_sl_code", label: "GL-SL Code" },
-  { key: "uacs", label: "UACS" },
-  { key: "acquisition_cost", label: "Acquisition Cost" },
-  { key: "received_date", label: "Received Date" },
-  { key: "estimated_useful_life", label: "Estimated Useful Life" },
-  { key: "mode_acquisition", label: "Mode of Acquisition" },
-  { key: "source_acquisition", label: "Source of Acquisition" },
-  { key: "donor", label: "Donor" },
-  { key: "source_fund", label: "Source of Fund" },
-  { key: "allotment_class", label: "Allotment Class" },
-  { key: "pmp_plan", label: "PMP Reference Item Number" },
-  { key: "supporting_documents1", label: "Supporting Documents (Reference Item)" },
-  { key: "or_si_dr_iar_no", label: "OR / SI / DR / IAR No." },
-  { key: "transaction_type", label: "Transaction Type" },
-  { key: "accountable_officer", label: "Accountable Officer" },
-  { key: "date_assigned_accountable_officer", label: "Date Assigned to Accountable Officer" },
-  { key: "end_user", label: "Custodian / End User" },
-  { key: "date_assigned_end_user", label: "Date Assigned to End User" },
-  { key: "received_by", label: "Received by" },
-  { key: "date_received_new_accountable", label: "Date Received by New Accountable" },
-  { key: "supporting_documents2", label: "Supporting Documents (Transaction)" },
-  { key: "par_ics_rrsp_rs_wmr_no", label: "PAR / ICS / RRSP / RS / WMR No." },
-  { key: "supplier", label: "Supplier / Distributor" },
+  { key: "brand_manufacturer", label: "Brand / Manufacturer" },
+  { key: "model", label: "Brand / Model" },
+  { key: "serial_number", label: "Serial No" },
+  { key: "location", label: "Location" },
+  { key: "erquipment_condition", label: "Condition" },
+  { key: "received_date", label: "Acquired" },
+  { key: "end_user", label: "Assigned To" },
   { key: "under_warranty", label: "Under Warranty" },
-  { key: "end_warranty_date", label: "End of Warranty Date" },
+  { key: "end_warranty_date", label: "End Warranty Date" },
   { key: "equipment_location", label: "Equipment Location" },
   { key: "non_functional", label: "Non-Functional" },
-  { key: "erquipment_condition", label: "Equipment Condition" },
-  { key: "disposition_status", label: "Accountability / Disposition Status" },
+  { key: "disposition_status", label: "Accountability Status" },
+  { key: "accountable_officer", label: "Accountable Officer" },
+  { key: "date_assigned_accountable_officer", label: "Date Assigned" },
   { key: "remarks", label: "Remarks" },
-  { key: "qr_code", label: "QR Code / Reference" },
 ];
 
 function setMessage(text, isError = false) {
@@ -82,8 +57,22 @@ async function api(action, options = {}) {
   if (options.body !== undefined) fetchOptions.body = options.body;
 
   const response = await fetch(`${API_URL}?action=${encodeURIComponent(action)}`, fetchOptions);
-  const data = await response.json();
-  if (!response.ok || !data.ok) throw new Error(data.message || "Request failed.");
+  const raw = await response.text();
+  let data = null;
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch (_error) {
+    data = null;
+  }
+
+  if (!response.ok || !data?.ok) {
+    const fallback = raw && raw.trim() ? raw.trim() : `HTTP ${response.status}`;
+    const message = data?.message || data?.detail || fallback || "Request failed.";
+    if (/bad request/i.test(message)) {
+      throw new Error("Request failed. Please refresh and try again.");
+    }
+    throw new Error(message);
+  }
   return data;
 }
 
@@ -106,9 +95,11 @@ function switchView(view) {
 
 function renderInventory() {
   const tableEl = inventoryTableWrap?.querySelector(".inventoryTable");
-  const forcedMinWidth = INVENTORY_COLUMNS.length * 240;
+  const wrapWidth = inventoryTableWrap?.clientWidth || 0;
+  const forcedMinWidth = Math.max(INVENTORY_COLUMNS.length * 240, wrapWidth + 800);
   if (tableEl) {
     tableEl.style.minWidth = `${forcedMinWidth}px`;
+    tableEl.style.width = `${forcedMinWidth}px`;
   }
 
   inventoryHead.innerHTML = `<tr>${INVENTORY_COLUMNS.map((c) => `<th>${c.label}</th>`).join("")}</tr>`;
@@ -124,7 +115,7 @@ function renderInventory() {
 
   if (!filtered.length) {
     inventoryBody.innerHTML = `<tr><td colspan="${INVENTORY_COLUMNS.length}" class="empty">No records found.</td></tr>`;
-    refreshInventorySlider();
+    requestAnimationFrame(refreshInventorySlider);
     return;
   }
 
@@ -143,16 +134,20 @@ function renderInventory() {
     </tr>
   `).join("");
 
-  refreshInventorySlider();
+  requestAnimationFrame(refreshInventorySlider);
 }
 
 function refreshInventorySlider() {
-  if (!inventoryTableWrap || !inventorySlider) return;
-  const maxScroll = Math.max(0, inventoryTableWrap.scrollWidth - inventoryTableWrap.clientWidth);
+  if (!inventoryTableWrap) return;
+  const tableEl = inventoryTableWrap.querySelector(".inventoryTable");
+  const tableWidth = tableEl ? tableEl.scrollWidth : inventoryTableWrap.scrollWidth;
+  const maxScroll = Math.max(0, tableWidth - inventoryTableWrap.clientWidth);
   inventoryTableWrap.scrollLeft = Math.min(inventoryTableWrap.scrollLeft, maxScroll);
-  inventorySlider.max = String(maxScroll);
-  inventorySlider.value = String(Math.min(maxScroll, inventoryTableWrap.scrollLeft));
-  inventorySlider.disabled = maxScroll <= 0;
+  if (inventorySlider) {
+    inventorySlider.max = String(maxScroll);
+    inventorySlider.value = String(Math.min(maxScroll, inventoryTableWrap.scrollLeft));
+    inventorySlider.disabled = maxScroll <= 0;
+  }
 }
 
 function renderImports() {
@@ -309,11 +304,14 @@ searchInput.addEventListener("input", (e) => {
 });
 
 inventoryTableWrap.addEventListener("scroll", refreshInventorySlider);
-inventorySlider.addEventListener("input", () => {
-  inventoryTableWrap.scrollLeft = Number(inventorySlider.value || 0);
-});
+if (inventorySlider) {
+  inventorySlider.addEventListener("input", () => {
+    inventoryTableWrap.scrollLeft = Number(inventorySlider.value || 0);
+  });
+}
 
 window.addEventListener("resize", refreshInventorySlider);
+window.addEventListener("load", refreshInventorySlider);
 
 clearDeletedBtn.addEventListener("click", async () => {
   try {
@@ -324,6 +322,20 @@ clearDeletedBtn.addEventListener("click", async () => {
     setMessage(error.message, true);
   }
 });
+
+if (deleteAllInventoryBtn) {
+  deleteAllInventoryBtn.addEventListener("click", async () => {
+    const okay = window.confirm("Delete all current inventory data for this school?");
+    if (!okay) return;
+    try {
+      const data = await api("delete_all_inventory", { method: "POST" });
+      await refreshData();
+      setMessage(data.message || "All inventory deleted.");
+    } catch (error) {
+      setMessage(error.message, true);
+    }
+  });
+}
 
 logoutBtn.addEventListener("click", async () => {
   try {

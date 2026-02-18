@@ -75,8 +75,22 @@ async function api(action, options = {}) {
   if (options.body !== undefined) fetchOptions.body = options.body;
 
   const response = await fetch(`${API_URL}?action=${encodeURIComponent(action)}`, fetchOptions);
-  const data = await response.json();
-  if (!response.ok || !data.ok) throw new Error(data.message || "Request failed.");
+  const raw = await response.text();
+  let data = null;
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch (_error) {
+    data = null;
+  }
+
+  if (!response.ok || !data?.ok) {
+    const fallback = raw && raw.trim() ? raw.trim() : `HTTP ${response.status}`;
+    const message = data?.message || data?.detail || fallback || "Request failed.";
+    if (/bad request/i.test(message)) {
+      throw new Error("Request failed. Please refresh and try again.");
+    }
+    throw new Error(message);
+  }
   return data;
 }
 

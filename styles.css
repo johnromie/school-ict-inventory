@@ -131,6 +131,7 @@ input {
 .btn.primary { background: var(--primary); color: #fff; }
 .btn.secondary { background: var(--secondary); color: #fff; }
 .btn.ghost { background: #eef2f7; color: #1f2937; border: 1px solid #d7dee8; }
+.btn.danger { background: #c62828; color: #fff; }
 
 .pill {
   padding: 6px 10px;
@@ -154,6 +155,13 @@ input {
   justify-content: space-between;
   flex-wrap: wrap;
   margin-bottom: 8px;
+}
+
+.panelHeadActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .stats {
