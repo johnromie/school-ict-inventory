@@ -15,6 +15,7 @@ psCommand = "$wd='" & projectPath & "'; " & _
   "$pids=(netstat -ano | Select-String ':8000' | Select-String 'LISTENING' | ForEach-Object { ($_ -split '\s+')[-1] } | Sort-Object -Unique); " & _
   "foreach($pid in $pids){Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue}; " & _
   "Start-Sleep -Milliseconds 500; " & _
+  "$env:PORT='8000'; " & _
   "Start-Process -FilePath $node -ArgumentList @('server.js') -WorkingDirectory $wd -WindowStyle Hidden; " & _
   "Start-Sleep -Milliseconds 900; " & _
   "Start-Process 'http://localhost:8000'"

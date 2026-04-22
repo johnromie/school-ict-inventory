@@ -21,6 +21,7 @@ if not exist node_modules (
     exit /b 1
   )
 )
+set PORT=8000
 for /f %%i in ('powershell -NoProfile -Command "(Get-NetIPAddress -AddressFamily IPv4 ^| Where-Object {$_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*'} ^| Select-Object -First 1 -ExpandProperty IPAddress)"') do set "LAN_IP=%%i"
 echo Starting server on: 0.0.0.0:8000
 if defined LAN_IP (

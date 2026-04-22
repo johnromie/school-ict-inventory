@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 
 const express = require("express");
 const session = require("express-session");
@@ -124,7 +125,9 @@ function normalizeBcryptHash(hash) {
 function openDb() {
   let sqlitePath = process.env.SQLITE_PATH;
   if (!sqlitePath || !String(sqlitePath).trim()) {
-    sqlitePath = path.join(__dirname, "data", "inventory.sqlite");
+    // Hosting providers sometimes deploy source to a read-only directory.
+    // Default to the user's home directory (typically writable) unless SQLITE_PATH is explicitly set.
+    sqlitePath = path.join(os.homedir(), ".school-ict-inventory", "inventory.sqlite");
   }
 
   const sqliteDir = path.dirname(sqlitePath);
@@ -360,6 +363,14 @@ function archiveCurrentInventory(dbx, schoolId, fileName, timestamp) {
 
 const app = express();
 app.disable("x-powered-by");
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err && err.stack ? err.stack : err);
+});
 
 app.use(
   session({
@@ -877,6 +888,10 @@ app.post("/api.php", (req, res, next) => {
 
 app.use(express.static(__dirname));
 
+app.get("/healthz", (req, res) => {
+  res.type("text/plain").send("ok");
+});
+
 app.use((err, req, res, next) => {
   if (!err) return next();
   const isJsonParse = err instanceof SyntaxError && String(err.message || "").toLowerCase().includes("json");
@@ -887,7 +902,8 @@ app.use((err, req, res, next) => {
   jsonResponse(res, { ok: false, message: err.message || "Server error." }, 500);
 });
 
-const port = Number(process.env.PORT || 8000);
+// Most Node hosting platforms inject PORT. If not set, default to 3000 for hosting compatibility.
+const port = Number(process.env.PORT || 3000);
 app.locals.dbxPromise = openDb();
 
 app.locals.dbxPromise

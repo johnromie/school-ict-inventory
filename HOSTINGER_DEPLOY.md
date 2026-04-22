@@ -32,5 +32,7 @@ It uses `sql.js` (SQLite compiled to WebAssembly) so it installs on Hostinger wi
    - Enable HTTPS via Certbot.
 
 ## Notes
-- The SQLite file is the “database”. Make sure `SQLITE_PATH` points to a persistent folder (not `/tmp` / build folders).
+- The SQLite file is the “database”.
+- Recommended: set `SQLITE_PATH` to a persistent folder under your account home (writable), not `/tmp` / build folders.
+- If `SQLITE_PATH` is not set, the app defaults to `~/.school-ict-inventory/inventory.sqlite`.
 - If you want multiple admins, use Admin Combined page → Admin Account Management.
