@@ -165,6 +165,11 @@ function openDb() {
       return { changes: database.getRowsModified() };
     }
 
+    function exec(sql) {
+      database.exec(sql);
+      return { changes: database.getRowsModified() };
+    }
+
     function all(sql, params = []) {
       const stmt = database.prepare(sql);
       const rows = [];
@@ -200,7 +205,8 @@ function openDb() {
       }
     }
 
-    run(`
+    // `sql.js` prepare/run executes only a single statement; use exec() for schema blocks.
+    exec(`
     CREATE TABLE IF NOT EXISTS schools (
       school_id TEXT PRIMARY KEY,
       school_name TEXT NOT NULL
@@ -253,6 +259,21 @@ function openDb() {
     );
   `);
 
+    const requiredTables = [
+      "schools",
+      "admin_users",
+      "inventory_items",
+      "import_logs",
+      "deleted_logs",
+      "deleted_inventory_items"
+    ];
+    const missingTables = requiredTables.filter(
+      (name) => !get("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", [name])?.name
+    );
+    if (missingTables.length) {
+      throw new Error(`SQLite schema init failed; missing tables: ${missingTables.join(", ")}`);
+    }
+
     const upsertSchoolSql = `
     INSERT INTO schools (school_id, school_name)
     VALUES (@school_id, @school_name)
@@ -297,6 +318,7 @@ function openDb() {
       sqlitePath,
       persist,
       run,
+      exec,
       all,
       get,
       transaction,
