@@ -4,13 +4,14 @@ DepEd-style ICT inventory with separate Admin and School login, CSV upload per s
 
 ## Tech stack
 - Frontend: `index.html`, `styles.css`, `script.js`
-- Backend API: `api.php`
-- Database: SQLite at `data/inventory.sqlite` (auto-created)
+- Backend API: Node.js (`server.js`) exposing `GET/POST /api.php?action=...`
+- Database: SQLite at `data/inventory.sqlite` (auto-created) or env `SQLITE_PATH`
 
 ## Run locally
-1. Install PHP (must be available in PATH).
-2. Double-click `start-local-server.bat` or `autorun.bat`.
-3. Open `http://localhost:8000`.
+1. Install Node.js (v18+ recommended).
+2. Run `npm install` once.
+3. Double-click `start-local-server.bat` or `autorun.bat`.
+4. Open `http://localhost:8000`.
 
 ## Auto-push changes to GitHub
 1. Run `start-github-autosync.bat`.
@@ -21,6 +22,7 @@ DepEd-style ICT inventory with separate Admin and School login, CSV upload per s
 Notes:
 - Requires git repo + GitHub remote + logged-in git credentials.
 - Uses commit message format: `auto-sync: YYYY-MM-DD HH:mm:ss`.
+- First-time setup: see `GITHUB_SETUP.md`.
 
 ## Deploy on Render (works on any network)
 1. Push this project to GitHub.
@@ -30,6 +32,9 @@ Notes:
    - `https://<your-service-name>.onrender.com`
 5. Use the same login:
    - Admin: `ictadmin` / `marinduque123`
+
+## Deploy on Hostinger (Node.js)
+See `HOSTINGER_DEPLOY.md`.
 
 ## Use on other devices (same Wi-Fi/LAN)
 1. Start the server on this PC.

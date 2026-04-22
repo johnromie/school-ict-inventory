@@ -7,3 +7,5 @@ services:
     envVars:
       - key: SQLITE_PATH
         value: /tmp/inventory.sqlite
+      - key: SESSION_SECRET
+        value: change-me-in-render

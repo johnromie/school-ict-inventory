@@ -1,14 +1,13 @@
-FROM php:8.2-cli
-
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends libsqlite3-dev \
-  && docker-php-ext-install pdo pdo_sqlite \
-  && rm -rf /var/lib/apt/lists/*
+FROM node:20-bookworm-slim
 
 WORKDIR /opt/render/project/src
+
+COPY package.json /opt/render/project/src/package.json
+
+RUN npm install --omit=dev
 
 COPY . /opt/render/project/src
 
 ENV PORT=10000
 
-CMD ["sh", "-c", "php -S 0.0.0.0:${PORT} -t /opt/render/project/src"]
+CMD ["node", "server.js"]

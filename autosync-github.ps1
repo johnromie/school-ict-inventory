@@ -66,11 +66,13 @@ $onChange = {
   $fullPath = $eventArgs.FullPath
 
   if ($fullPath -match "\\\.git\\") { return }
+  if ($fullPath -match "\\node_modules\\") { return }
   if ($fullPath -match "\\data\\.*\.sqlite") { return }
 
   $script:pending = $true
   $script:lastChange = Get-Date
 }
+
 
 $subs = @(
   Register-ObjectEvent $watcher Changed -Action $onChange,
