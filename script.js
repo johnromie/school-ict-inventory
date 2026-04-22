@@ -7,6 +7,8 @@ const schoolIdInput = document.getElementById("schoolId");
 const schoolNameInput = document.getElementById("schoolName");
 const schoolLoginBtn = document.getElementById("schoolLoginBtn");
 const schoolLoginMessageEl = document.getElementById("schoolLoginMessage");
+const schoolRegisterBtn = document.getElementById("schoolRegisterBtn");
+const schoolChangeRegistrationBtn = document.getElementById("schoolChangeRegistrationBtn");
 
 const logoutBtn = document.getElementById("logoutBtn");
 const activeSchoolBadge = document.getElementById("activeSchoolBadge");
@@ -48,14 +50,75 @@ let importRows = [];
 let deletedRows = [];
 let adminUsersRows = [];
 
-function setMessage(text, isError = false) {
-  messageEl.textContent = text;
-  messageEl.classList.toggle("error", isError);
+const SCHOOL_REG_KEY = "school_ict_inventory_school_registration_v1";
+
+function normalizeSchoolRegValue(value) {
+  return String(value ?? "").trim();
+}
+
+function getSchoolRegistration() {
+  try {
+    const raw = localStorage.getItem(SCHOOL_REG_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const schoolId = normalizeSchoolRegValue(parsed?.schoolId);
+    const schoolName = normalizeSchoolRegValue(parsed?.schoolName);
+    if (!schoolId || !schoolName) return null;
+    return { schoolId, schoolName };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function setSchoolRegistration(reg) {
+  const out = {
+    schoolId: normalizeSchoolRegValue(reg?.schoolId),
+    schoolName: normalizeSchoolRegValue(reg?.schoolName),
+  };
+  if (!out.schoolId || !out.schoolName) return false;
+  localStorage.setItem(SCHOOL_REG_KEY, JSON.stringify(out));
+  return true;
+}
+
+function clearSchoolRegistration() {
+  localStorage.removeItem(SCHOOL_REG_KEY);
+}
+
+function setSchoolLoginReadOnly(isReadOnly) {
+  if (schoolIdInput) schoolIdInput.readOnly = isReadOnly;
+  if (schoolNameInput) schoolNameInput.readOnly = isReadOnly;
 }
 
 function setSchoolLoginMessage(text, isError = false) {
   schoolLoginMessageEl.textContent = text;
   schoolLoginMessageEl.style.color = isError ? "#991b1b" : "#0b5d4a";
+}
+
+function applySchoolRegistrationUI() {
+  if (!schoolIdInput || !schoolNameInput || !schoolLoginBtn) return;
+  const reg = getSchoolRegistration();
+
+  const hasReg = Boolean(reg);
+  schoolRegisterBtn?.classList.toggle("hidden", hasReg);
+  schoolChangeRegistrationBtn?.classList.toggle("hidden", !hasReg);
+
+  if (!hasReg) {
+    setSchoolLoginReadOnly(false);
+    schoolLoginBtn.disabled = true;
+    setSchoolLoginMessage("Please register your School ID and School Name first.", false);
+    return;
+  }
+
+  schoolIdInput.value = reg.schoolId;
+  schoolNameInput.value = reg.schoolName;
+  setSchoolLoginReadOnly(true);
+  schoolLoginBtn.disabled = false;
+  setSchoolLoginMessage(`Registered: ${reg.schoolId} — ${reg.schoolName}`, false);
+}
+
+function setMessage(text, isError = false) {
+  messageEl.textContent = text;
+  messageEl.classList.toggle("error", isError);
 }
 
 function setAdminLoginMessage(text, isError = false) {
@@ -287,11 +350,40 @@ adminLoginBtn.addEventListener("click", async () => {
   }
 });
 
+schoolRegisterBtn?.addEventListener("click", () => {
+  const schoolId = schoolIdInput?.value ?? "";
+  const schoolName = schoolNameInput?.value ?? "";
+  const ok = setSchoolRegistration({ schoolId, schoolName });
+  if (!ok) {
+    setSchoolLoginMessage("Enter both School ID and School Name to register.", true);
+    return;
+  }
+  applySchoolRegistrationUI();
+});
+
+schoolChangeRegistrationBtn?.addEventListener("click", () => {
+  clearSchoolRegistration();
+  if (schoolIdInput) schoolIdInput.value = "";
+  if (schoolNameInput) schoolNameInput.value = "";
+  applySchoolRegistrationUI();
+  schoolIdInput?.focus();
+});
+
 schoolLoginBtn.addEventListener("click", async () => {
+  const reg = getSchoolRegistration();
+  if (!reg) {
+    applySchoolRegistrationUI();
+    setSchoolLoginMessage("Please register first before logging in.", true);
+    return;
+  }
+
   const schoolId = schoolIdInput.value.trim();
   const schoolName = schoolNameInput.value.trim();
-  if (!schoolId || !schoolName) {
-    setSchoolLoginMessage("Enter both School ID and School Name.", true);
+  if (schoolId !== reg.schoolId || schoolName !== reg.schoolName) {
+    setSchoolLoginReadOnly(true);
+    schoolIdInput.value = reg.schoolId;
+    schoolNameInput.value = reg.schoolName;
+    setSchoolLoginMessage("School Login uses your registered School ID and School Name.", true);
     return;
   }
   try {
@@ -426,3 +518,4 @@ document.querySelectorAll("[data-view]").forEach((btn) => {
 });
 
 syncSession();
+applySchoolRegistrationUI();
