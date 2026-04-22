@@ -79,6 +79,12 @@ body::before {
   max-width: 100%;
 }
 
+body[data-page="login"] .page {
+  justify-items: center;
+  padding-top: 22px;
+  padding-bottom: 42px;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -86,15 +92,28 @@ body::before {
   padding: 12px;
   box-shadow: 0 8px 24px rgba(16, 35, 61, 0.15);
   max-width: 100%;
+  backdrop-filter: blur(3px);
 }
 
 .loginPanel {
-  max-width: 520px;
+  max-width: 560px;
+  width: min(560px, 100%);
+  padding: 18px 18px 16px;
 }
 
 h2 {
   margin: 0 0 8px;
   font-size: 1.6rem;
+}
+
+.loginPanel h3 {
+  margin: 14px 0 8px;
+}
+
+.loginPanel hr {
+  border: 0;
+  border-top: 1px solid rgba(209, 213, 219, 0.9);
+  margin: 16px 0;
 }
 
 .formGrid2 {
@@ -121,17 +140,31 @@ input {
   background: #fff;
 }
 
+input:focus {
+  outline: none;
+  border-color: rgba(12, 63, 143, 0.65);
+  box-shadow: 0 0 0 3px rgba(12, 63, 143, 0.15);
+}
+
 .btn {
   border: 0;
   border-radius: 8px;
   padding: 9px 14px;
   cursor: pointer;
+  transition: transform 0.05s ease, filter 0.15s ease;
 }
 
 .btn.primary { background: var(--primary); color: #fff; }
 .btn.secondary { background: var(--secondary); color: #fff; }
 .btn.ghost { background: #eef2f7; color: #1f2937; border: 1px solid #d7dee8; }
 .btn.danger { background: #c62828; color: #fff; }
+
+.btn:hover { filter: brightness(0.98); }
+.btn:active { transform: translateY(1px); }
+
+body[data-page="login"] .loginPanel .btn {
+  width: 100%;
+}
 
 .pill {
   padding: 6px 10px;
