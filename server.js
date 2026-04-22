@@ -6,8 +6,8 @@ const express = require("express");
 const session = require("express-session");
 const multer = require("multer");
 const bcrypt = require("bcryptjs");
-const Database = require("better-sqlite3");
 const { parse: parseCsv } = require("csv-parse/sync");
+const initSqlJs = require("sql.js");
 
 const DEFAULT_ADMIN_USERNAME = "ictadmin";
 const DEFAULT_ADMIN_PASSWORD = "marinduque123";
@@ -132,10 +132,72 @@ function openDb() {
     fs.mkdirSync(sqliteDir, { recursive: true });
   }
 
-  const db = new Database(sqlitePath);
-  db.pragma("journal_mode = WAL");
+  const distDir = path.dirname(require.resolve("sql.js/dist/sql-wasm.js"));
 
-  db.exec(`
+  async function init() {
+    const SQL = await initSqlJs({
+      locateFile: (file) => path.join(distDir, file)
+    });
+
+    let database;
+    if (fs.existsSync(sqlitePath)) {
+      const fileBuf = fs.readFileSync(sqlitePath);
+      database = new SQL.Database(new Uint8Array(fileBuf));
+    } else {
+      database = new SQL.Database();
+    }
+
+    function persist() {
+      const exported = database.export();
+      fs.writeFileSync(sqlitePath, Buffer.from(exported));
+    }
+
+    function run(sql, params = []) {
+      const stmt = database.prepare(sql);
+      try {
+        stmt.run(params);
+      } finally {
+        stmt.free();
+      }
+      return { changes: database.getRowsModified() };
+    }
+
+    function all(sql, params = []) {
+      const stmt = database.prepare(sql);
+      const rows = [];
+      try {
+        stmt.bind(params);
+        while (stmt.step()) {
+          rows.push(stmt.getAsObject());
+        }
+      } finally {
+        stmt.free();
+      }
+      return rows;
+    }
+
+    function get(sql, params = []) {
+      const rows = all(sql, params);
+      return rows[0];
+    }
+
+    function transaction(fn) {
+      run("BEGIN");
+      try {
+        const out = fn();
+        run("COMMIT");
+        persist();
+        return out;
+      } catch (e) {
+        try {
+          run("ROLLBACK");
+        } catch (_ignored) {
+        }
+        throw e;
+      }
+    }
+
+    run(`
     CREATE TABLE IF NOT EXISTS schools (
       school_id TEXT PRIMARY KEY,
       school_name TEXT NOT NULL
@@ -188,27 +250,59 @@ function openDb() {
     );
   `);
 
-  const upsertSchool = db.prepare(`
+    const upsertSchoolSql = `
     INSERT INTO schools (school_id, school_name)
     VALUES (@school_id, @school_name)
     ON CONFLICT(school_id) DO UPDATE SET school_name = excluded.school_name;
-  `);
-  const seedSchools = db.transaction(() => {
-    for (const school of REGISTERED_SCHOOLS) upsertSchool.run(school);
-  });
-  seedSchools();
+  `;
+    transaction(() => {
+      for (const school of REGISTERED_SCHOOLS) {
+        // Named params supported via stmt.getAsObject binding by passing an object
+        const stmt = database.prepare(upsertSchoolSql);
+        try {
+          stmt.run({
+            "@school_id": school.school_id,
+            "@school_name": school.school_name
+          });
+        } finally {
+          stmt.free();
+        }
+      }
 
-  const adminExists = db
-    .prepare("SELECT COUNT(*) AS total FROM admin_users WHERE username = ?")
-    .get(DEFAULT_ADMIN_USERNAME);
-  if ((adminExists?.total ?? 0) === 0) {
-    const password_hash = bcrypt.hashSync(DEFAULT_ADMIN_PASSWORD, 10);
-    db.prepare(
-      "INSERT INTO admin_users (username, password_hash, created_at) VALUES (?, ?, ?)"
-    ).run(DEFAULT_ADMIN_USERNAME, password_hash, nowIso());
+      const adminExists = get("SELECT COUNT(*) AS total FROM admin_users WHERE username = ?", [
+        DEFAULT_ADMIN_USERNAME
+      ]);
+      if (Number(adminExists?.total ?? 0) === 0) {
+        const password_hash = bcrypt.hashSync(DEFAULT_ADMIN_PASSWORD, 10);
+        run("INSERT INTO admin_users (username, password_hash, created_at) VALUES (?, ?, ?)", [
+          DEFAULT_ADMIN_USERNAME,
+          password_hash,
+          nowIso()
+        ]);
+      }
+    });
+
+    // Serialize all DB ops because sql.js uses a single in-memory database instance.
+    let chain = Promise.resolve();
+    function withLock(fn) {
+      const next = chain.then(fn, fn);
+      chain = next.catch(() => {});
+      return next;
+    }
+
+    return {
+      sqlitePath,
+      persist,
+      run,
+      all,
+      get,
+      transaction,
+      withLock,
+      raw: database
+    };
   }
 
-  return db;
+  return init();
 }
 
 function schoolFromRegistry(schoolId, schoolName) {
@@ -239,33 +333,31 @@ function requireLogin(req, res) {
   return user;
 }
 
-function archiveCurrentInventory(db, schoolId, fileName, timestamp) {
-  const total = db
-    .prepare("SELECT COUNT(*) AS total FROM inventory_items WHERE school_id = ?")
-    .get(schoolId)?.total;
+function archiveCurrentInventory(dbx, schoolId, fileName, timestamp) {
+  const total = dbx.get("SELECT COUNT(*) AS total FROM inventory_items WHERE school_id = ?", [schoolId])?.total;
   const rowCount = Number(total ?? 0);
   if (rowCount === 0) return 0;
 
-  const deletedInfo = db
-    .prepare(
-      "INSERT INTO deleted_logs (school_id, file_name, row_count, deleted_at) VALUES (?, ?, ?, ?)"
-    )
-    .run(schoolId, fileName, rowCount, timestamp);
-  const deletedLogId = Number(deletedInfo.lastInsertRowid);
+  dbx.run("INSERT INTO deleted_logs (school_id, file_name, row_count, deleted_at) VALUES (?, ?, ?, ?)", [
+    schoolId,
+    fileName,
+    rowCount,
+    timestamp
+  ]);
+  const deletedLogId = Number(dbx.get("SELECT last_insert_rowid() AS id")?.id ?? 0);
 
-  db.prepare(`
+  dbx.run(`
     INSERT INTO deleted_inventory_items (
       deleted_log_id, school_id, item_name, quantity, item_condition, remarks, raw_json, deleted_at
     )
     SELECT ?, school_id, item_name, quantity, item_condition, remarks, raw_json, ?
     FROM inventory_items
     WHERE school_id = ?;
-  `).run(deletedLogId, timestamp, schoolId);
+  `, [deletedLogId, timestamp, schoolId]);
 
   return deletedLogId;
 }
 
-const db = openDb();
 const app = express();
 app.disable("x-powered-by");
 
@@ -298,6 +390,8 @@ async function handleApi(req, res) {
   const action = String(req.query.action ?? req.body?.action ?? "");
 
   try {
+    const dbx = await req.app.locals.dbxPromise;
+
     if (action === "session") {
       jsonResponse(res, { ok: true, session: req.session?.user ?? null });
       return;
@@ -311,9 +405,9 @@ async function handleApi(req, res) {
         return;
       }
 
-      const admin = db
-        .prepare("SELECT username, password_hash FROM admin_users WHERE username = ?")
-        .get(username);
+      const admin = await dbx.withLock(() =>
+        dbx.get("SELECT username, password_hash FROM admin_users WHERE username = ?", [username])
+      );
       const stored = normalizeBcryptHash(admin?.password_hash ?? "");
       if (!admin || !bcrypt.compareSync(password, stored)) {
         jsonResponse(res, { ok: false, message: "Invalid admin credentials." }, 401);
@@ -381,33 +475,32 @@ async function handleApi(req, res) {
       const schoolId = String(user.schoolId);
       const stamp = nowIso();
 
-      const tx = db.transaction(() => {
-        archiveCurrentInventory(db, schoolId, "previous_inventory.csv", stamp);
-        db.prepare("DELETE FROM inventory_items WHERE school_id = ?").run(schoolId);
+      await dbx.withLock(() =>
+        dbx.transaction(() => {
+          archiveCurrentInventory(dbx, schoolId, "previous_inventory.csv", stamp);
+          dbx.run("DELETE FROM inventory_items WHERE school_id = ?", [schoolId]);
 
-        const insertItem = db.prepare(`
-          INSERT INTO inventory_items (school_id, item_name, quantity, item_condition, remarks, raw_json, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?);
-        `);
-        for (const row of rows) {
-          insertItem.run(
-            schoolId,
-            row.item_name,
-            row.quantity,
-            row.condition,
-            row.remarks,
-            row.raw_json ?? null,
-            stamp
+          for (const row of rows) {
+            dbx.run(
+              "INSERT INTO inventory_items (school_id, item_name, quantity, item_condition, remarks, raw_json, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?);",
+              [
+                schoolId,
+                row.item_name,
+                row.quantity,
+                row.condition,
+                row.remarks,
+                row.raw_json ?? null,
+                stamp
+              ]
+            );
+          }
+
+          dbx.run(
+            "INSERT INTO import_logs (school_id, file_name, row_count, imported_at) VALUES (?, ?, ?, ?);",
+            [schoolId, String(file.originalname ?? "upload.csv"), rows.length, stamp]
           );
-        }
-
-        db.prepare(`
-          INSERT INTO import_logs (school_id, file_name, row_count, imported_at)
-          VALUES (?, ?, ?, ?);
-        `).run(schoolId, String(file.originalname ?? "upload.csv"), rows.length, stamp);
-      });
-
-      tx();
+        })
+      );
       jsonResponse(res, { ok: true, message: "CSV uploaded successfully.", rows: rows.length });
       return;
     }
@@ -417,24 +510,27 @@ async function handleApi(req, res) {
       if (!user) return;
       let rows = [];
       if (user.role === "admin") {
-        rows = db
-          .prepare(`
+        rows = await dbx.withLock(() =>
+          dbx.all(`
             SELECT i.school_id, s.school_name, i.item_name, i.quantity, i.item_condition, i.remarks, i.raw_json
             FROM inventory_items i
             JOIN schools s ON s.school_id = i.school_id
             ORDER BY s.school_name ASC, i.item_name ASC;
           `)
-          .all();
+        );
       } else {
-        rows = db
-          .prepare(`
-            SELECT i.school_id, s.school_name, i.item_name, i.quantity, i.item_condition, i.remarks, i.raw_json
-            FROM inventory_items i
-            JOIN schools s ON s.school_id = i.school_id
-            WHERE i.school_id = ?
-            ORDER BY i.item_name ASC;
-          `)
-          .all(String(user.schoolId));
+        rows = await dbx.withLock(() =>
+          dbx.all(
+            `
+              SELECT i.school_id, s.school_name, i.item_name, i.quantity, i.item_condition, i.remarks, i.raw_json
+              FROM inventory_items i
+              JOIN schools s ON s.school_id = i.school_id
+              WHERE i.school_id = ?
+              ORDER BY i.item_name ASC;
+            `,
+            [String(user.schoolId)]
+          )
+        );
       }
 
       const mapped = rows.map((row) => {
@@ -457,24 +553,27 @@ async function handleApi(req, res) {
 
       let rows = [];
       if (user.role === "admin") {
-        rows = db
-          .prepare(`
+        rows = await dbx.withLock(() =>
+          dbx.all(`
             SELECT l.file_name, l.row_count, l.imported_at, s.school_id, s.school_name
             FROM import_logs l
             JOIN schools s ON s.school_id = l.school_id
             ORDER BY l.imported_at DESC;
           `)
-          .all();
+        );
       } else {
-        rows = db
-          .prepare(`
-            SELECT l.file_name, l.row_count, l.imported_at, s.school_id, s.school_name
-            FROM import_logs l
-            JOIN schools s ON s.school_id = l.school_id
-            WHERE l.school_id = ?
-            ORDER BY l.imported_at DESC;
-          `)
-          .all(String(user.schoolId));
+        rows = await dbx.withLock(() =>
+          dbx.all(
+            `
+              SELECT l.file_name, l.row_count, l.imported_at, s.school_id, s.school_name
+              FROM import_logs l
+              JOIN schools s ON s.school_id = l.school_id
+              WHERE l.school_id = ?
+              ORDER BY l.imported_at DESC;
+            `,
+            [String(user.schoolId)]
+          )
+        );
       }
 
       jsonResponse(res, { ok: true, rows });
@@ -487,8 +586,8 @@ async function handleApi(req, res) {
 
       let rows = [];
       if (user.role === "admin") {
-        rows = db
-          .prepare(`
+        rows = await dbx.withLock(() =>
+          dbx.all(`
             SELECT l.id, l.file_name, l.row_count, l.deleted_at, l.restored_at, s.school_id, s.school_name,
                    CASE WHEN l.restored_at IS NULL AND EXISTS (
                      SELECT 1 FROM deleted_inventory_items di WHERE di.deleted_log_id = l.id
@@ -497,10 +596,11 @@ async function handleApi(req, res) {
             JOIN schools s ON s.school_id = l.school_id
             ORDER BY l.deleted_at DESC;
           `)
-          .all();
+        );
       } else {
-        rows = db
-          .prepare(`
+        rows = await dbx.withLock(() =>
+          dbx.all(
+            `
             SELECT l.id, l.file_name, l.row_count, l.deleted_at, l.restored_at, s.school_id, s.school_name,
                    CASE WHEN l.restored_at IS NULL AND EXISTS (
                      SELECT 1 FROM deleted_inventory_items di WHERE di.deleted_log_id = l.id
@@ -509,8 +609,10 @@ async function handleApi(req, res) {
             JOIN schools s ON s.school_id = l.school_id
             WHERE l.school_id = ?
             ORDER BY l.deleted_at DESC;
-          `)
-          .all(String(user.schoolId));
+          `,
+            [String(user.schoolId)]
+          )
+        );
       }
 
       jsonResponse(res, { ok: true, rows });
@@ -526,15 +628,18 @@ async function handleApi(req, res) {
       }
 
       const schoolId = String(user.schoolId);
-      const tx = db.transaction(() => {
-        const ids = db.prepare("SELECT id FROM deleted_logs WHERE school_id = ?").all(schoolId).map((r) => Number(r.id));
-        if (ids.length > 0) {
-          const placeholders = ids.map(() => "?").join(",");
-          db.prepare(`DELETE FROM deleted_inventory_items WHERE deleted_log_id IN (${placeholders})`).run(...ids);
-        }
-        db.prepare("DELETE FROM deleted_logs WHERE school_id = ?").run(schoolId);
-      });
-      tx();
+      await dbx.withLock(() =>
+        dbx.transaction(() => {
+          const ids = dbx
+            .all("SELECT id FROM deleted_logs WHERE school_id = ?", [schoolId])
+            .map((r) => Number(r.id));
+          if (ids.length > 0) {
+            const placeholders = ids.map(() => "?").join(",");
+            dbx.run(`DELETE FROM deleted_inventory_items WHERE deleted_log_id IN (${placeholders})`, ids);
+          }
+          dbx.run("DELETE FROM deleted_logs WHERE school_id = ?", [schoolId]);
+        })
+      );
       jsonResponse(res, { ok: true, message: "Deleted logs cleared." });
       return;
     }
@@ -551,12 +656,13 @@ async function handleApi(req, res) {
       const stamp = nowIso();
       let deletedCount = 0;
       let archived = 0;
-      const tx = db.transaction(() => {
-        archived = archiveCurrentInventory(db, schoolId, "manual_delete_all.csv", stamp);
-        const info = db.prepare("DELETE FROM inventory_items WHERE school_id = ?").run(schoolId);
-        deletedCount = Number(info.changes ?? 0);
-      });
-      tx();
+      await dbx.withLock(() =>
+        dbx.transaction(() => {
+          archived = archiveCurrentInventory(dbx, schoolId, "manual_delete_all.csv", stamp);
+          const info = dbx.run("DELETE FROM inventory_items WHERE school_id = ?", [schoolId]);
+          deletedCount = Number(info.changes ?? 0);
+        })
+      );
 
       if (deletedCount <= 0) {
         jsonResponse(res, { ok: true, message: "No inventory records to delete.", rows: 0, archived });
@@ -581,9 +687,9 @@ async function handleApi(req, res) {
       }
 
       const schoolId = String(user.schoolId);
-      const log = db
-        .prepare("SELECT id, school_id, file_name, restored_at FROM deleted_logs WHERE id = ? LIMIT 1")
-        .get(deletedLogId);
+      const log = await dbx.withLock(() =>
+        dbx.get("SELECT id, school_id, file_name, restored_at FROM deleted_logs WHERE id = ? LIMIT 1", [deletedLogId])
+      );
 
       if (!log || String(log.school_id) !== schoolId) {
         jsonResponse(res, { ok: false, message: "Deleted log not found." }, 404);
@@ -594,45 +700,48 @@ async function handleApi(req, res) {
         return;
       }
 
-      const snapshotRows = db
-        .prepare(
-          "SELECT item_name, quantity, item_condition, remarks, raw_json FROM deleted_inventory_items WHERE deleted_log_id = ? ORDER BY id ASC"
+      const snapshotRows = await dbx.withLock(() =>
+        dbx.all(
+          "SELECT item_name, quantity, item_condition, remarks, raw_json FROM deleted_inventory_items WHERE deleted_log_id = ? ORDER BY id ASC",
+          [deletedLogId]
         )
-        .all(deletedLogId);
+      );
       if (!snapshotRows || snapshotRows.length === 0) {
         jsonResponse(res, { ok: false, message: "No snapshot data available for this deleted file." }, 409);
         return;
       }
 
       const stamp = nowIso();
-      const tx = db.transaction(() => {
-        archiveCurrentInventory(db, schoolId, "before_restore_inventory.csv", stamp);
-        db.prepare("DELETE FROM inventory_items WHERE school_id = ?").run(schoolId);
+      await dbx.withLock(() =>
+        dbx.transaction(() => {
+          archiveCurrentInventory(dbx, schoolId, "before_restore_inventory.csv", stamp);
+          dbx.run("DELETE FROM inventory_items WHERE school_id = ?", [schoolId]);
 
-        const insertItem = db.prepare(`
-          INSERT INTO inventory_items (school_id, item_name, quantity, item_condition, remarks, raw_json, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        `);
-        for (const row of snapshotRows) {
-          insertItem.run(
+          for (const row of snapshotRows) {
+            dbx.run(
+              "INSERT INTO inventory_items (school_id, item_name, quantity, item_condition, remarks, raw_json, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+              [
+                schoolId,
+                String(row.item_name),
+                Number(row.quantity ?? 0),
+                String(row.item_condition),
+                String(row.remarks),
+                row.raw_json ?? null,
+                stamp
+              ]
+            );
+          }
+
+          dbx.run("INSERT INTO import_logs (school_id, file_name, row_count, imported_at) VALUES (?, ?, ?, ?)", [
             schoolId,
-            String(row.item_name),
-            Number(row.quantity ?? 0),
-            String(row.item_condition),
-            String(row.remarks),
-            row.raw_json ?? null,
+            `restored_${String(log.file_name)}`,
+            snapshotRows.length,
             stamp
-          );
-        }
+          ]);
 
-        db.prepare(`
-          INSERT INTO import_logs (school_id, file_name, row_count, imported_at)
-          VALUES (?, ?, ?, ?)
-        `).run(schoolId, `restored_${String(log.file_name)}`, snapshotRows.length, stamp);
-
-        db.prepare("UPDATE deleted_logs SET restored_at = ? WHERE id = ?").run(stamp, deletedLogId);
-      });
-      tx();
+          dbx.run("UPDATE deleted_logs SET restored_at = ? WHERE id = ?", [stamp, deletedLogId]);
+        })
+      );
       jsonResponse(res, { ok: true, message: "Deleted inventory restored.", rows: snapshotRows.length });
       return;
     }
@@ -644,7 +753,7 @@ async function handleApi(req, res) {
         jsonResponse(res, { ok: false, message: "Only admin can view admin accounts." }, 403);
         return;
       }
-      const rows = db.prepare("SELECT username, created_at FROM admin_users ORDER BY username ASC").all();
+      const rows = await dbx.withLock(() => dbx.all("SELECT username, created_at FROM admin_users ORDER BY username ASC"));
       jsonResponse(res, { ok: true, rows });
       return;
     }
@@ -672,17 +781,28 @@ async function handleApi(req, res) {
         return;
       }
 
-      const exists = db.prepare("SELECT COUNT(*) AS total FROM admin_users WHERE username = ?").get(username)?.total;
-      if (Number(exists ?? 0) > 0) {
-        jsonResponse(res, { ok: false, message: "Admin username already exists." }, 409);
-        return;
-      }
-
-      db.prepare("INSERT INTO admin_users (username, password_hash, created_at) VALUES (?, ?, ?)").run(
-        username,
-        bcrypt.hashSync(password, 10),
-        nowIso()
-      );
+      await dbx.withLock(() =>
+        dbx.transaction(() => {
+          const exists = dbx.get("SELECT COUNT(*) AS total FROM admin_users WHERE username = ?", [username])?.total;
+          if (Number(exists ?? 0) > 0) {
+            const err = new Error("Admin username already exists.");
+            err.statusCode = 409;
+            throw err;
+          }
+          dbx.run("INSERT INTO admin_users (username, password_hash, created_at) VALUES (?, ?, ?)", [
+            username,
+            bcrypt.hashSync(password, 10),
+            nowIso()
+          ]);
+        })
+      ).catch((e) => {
+        if (e && e.statusCode === 409) {
+          jsonResponse(res, { ok: false, message: e.message }, 409);
+          return null;
+        }
+        throw e;
+      });
+      if (res.headersSent) return;
       jsonResponse(res, { ok: true, message: "Admin account added." });
       return;
     }
@@ -707,17 +827,28 @@ async function handleApi(req, res) {
       }
 
       const username = String(user.username ?? "");
-      const row = db.prepare("SELECT password_hash FROM admin_users WHERE username = ?").get(username);
-      const stored = normalizeBcryptHash(row?.password_hash ?? "");
-      if (!row || !bcrypt.compareSync(currentPassword, stored)) {
-        jsonResponse(res, { ok: false, message: "Current password is incorrect." }, 401);
-        return;
-      }
-
-      db.prepare("UPDATE admin_users SET password_hash = ? WHERE username = ?").run(
-        bcrypt.hashSync(newPassword, 10),
-        username
-      );
+      await dbx.withLock(() =>
+        dbx.transaction(() => {
+          const row = dbx.get("SELECT password_hash FROM admin_users WHERE username = ?", [username]);
+          const stored = normalizeBcryptHash(row?.password_hash ?? "");
+          if (!row || !bcrypt.compareSync(currentPassword, stored)) {
+            const err = new Error("Current password is incorrect.");
+            err.statusCode = 401;
+            throw err;
+          }
+          dbx.run("UPDATE admin_users SET password_hash = ? WHERE username = ?", [
+            bcrypt.hashSync(newPassword, 10),
+            username
+          ]);
+        })
+      ).catch((e) => {
+        if (e && e.statusCode === 401) {
+          jsonResponse(res, { ok: false, message: e.message }, 401);
+          return null;
+        }
+        throw e;
+      });
+      if (res.headersSent) return;
       jsonResponse(res, { ok: true, message: "Admin password changed successfully." });
       return;
     }
@@ -757,6 +888,16 @@ app.use((err, req, res, next) => {
 });
 
 const port = Number(process.env.PORT || 8000);
-app.listen(port, "0.0.0.0", () => {
-  console.log(`School ICT Inventory server running on http://localhost:${port}`);
-});
+app.locals.dbxPromise = openDb();
+
+app.locals.dbxPromise
+  .then((dbx) => {
+    console.log(`SQLite DB path: ${dbx.sqlitePath}`);
+    app.listen(port, "0.0.0.0", () => {
+      console.log(`School ICT Inventory server running on http://localhost:${port}`);
+    });
+  })
+  .catch((e) => {
+    console.error("Failed to start server:", e);
+    process.exitCode = 1;
+  });

@@ -2,6 +2,8 @@
 
 This project runs as a single Node.js web app (static HTML + API at `/api.php`).
 
+It uses `sql.js` (SQLite compiled to WebAssembly) so it installs on Hostinger without `node-gyp` / build tools.
+
 ## Important (Hostinger plan)
 - If your Hostinger plan is **Shared Hosting (PHP only)**, you **cannot** run a Node.js server process.
   - Use a **VPS** (recommended) or a Hostinger plan that explicitly supports **Node.js apps**.
@@ -30,6 +32,5 @@ This project runs as a single Node.js web app (static HTML + API at `/api.php`).
    - Enable HTTPS via Certbot.
 
 ## Notes
-- The SQLite file is the “database”. Make sure `SQLITE_PATH` points to a persistent folder (not `/tmp`).
+- The SQLite file is the “database”. Make sure `SQLITE_PATH` points to a persistent folder (not `/tmp` / build folders).
 - If you want multiple admins, use Admin Combined page → Admin Account Management.
-
