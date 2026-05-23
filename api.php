@@ -161,6 +161,31 @@ function school_from_registry(string $schoolId, string $schoolName): ?array {
   return null;
 }
 
+function school_from_db(PDO $pdo, string $schoolId, string $schoolName): ?array {
+  $stmt = $pdo->prepare("
+    SELECT school_id, school_name
+    FROM schools
+    WHERE school_id = :school_id
+      AND lower(school_name) = lower(:school_name)
+    LIMIT 1
+  ");
+  $stmt->execute([
+    ":school_id" => $schoolId,
+    ":school_name" => $schoolName,
+  ]);
+  $row = $stmt->fetch();
+  if (!$row) return null;
+  return ["school_id" => (string)$row["school_id"], "school_name" => (string)$row["school_name"]];
+}
+
+function school_name_by_id(PDO $pdo, string $schoolId): ?string {
+  $stmt = $pdo->prepare("SELECT school_name FROM schools WHERE school_id = :school_id LIMIT 1");
+  $stmt->execute([":school_id" => $schoolId]);
+  $row = $stmt->fetch();
+  if (!$row) return null;
+  return (string)$row["school_name"];
+}
+
 function current_session(): ?array {
   if (!isset($_SESSION["user"]) || !is_array($_SESSION["user"])) {
     return null;
@@ -338,7 +363,7 @@ try {
       json_response(["ok" => false, "message" => "Enter both School ID and School Name."], 400);
     }
 
-    $school = school_from_registry($schoolId, $schoolName);
+    $school = school_from_db($pdo, $schoolId, $schoolName);
     if (!$school) {
       json_response(["ok" => false, "message" => "Access denied: school is not registered in Schools Division of Marinduque."], 403);
     }
@@ -350,6 +375,37 @@ try {
       "display" => $school["school_name"] . " (" . $school["school_id"] . ")",
     ];
     json_response(["ok" => true, "session" => $_SESSION["user"]]);
+  }
+
+  if ($action === "register_school") {
+    $data = read_json_input();
+    $schoolId = trim((string)($data["schoolId"] ?? ""));
+    $schoolName = trim((string)($data["schoolName"] ?? ""));
+
+    if ($schoolId === "" || $schoolName === "") {
+      json_response(["ok" => false, "message" => "Enter both School ID and School Name to register."], 400);
+    }
+
+    $upsert = $pdo->prepare("
+      INSERT INTO schools (school_id, school_name)
+      VALUES (:school_id, :school_name)
+      ON CONFLICT(school_id) DO UPDATE SET school_name = excluded.school_name
+    ");
+    $upsert->execute([
+      ":school_id" => $schoolId,
+      ":school_name" => $schoolName,
+    ]);
+
+    json_response(["ok" => true, "school" => ["schoolId" => $schoolId, "schoolName" => $schoolName]]);
+  }
+
+  if ($action === "school_lookup") {
+    $schoolId = trim((string)($_GET["schoolId"] ?? ""));
+    if ($schoolId === "") {
+      json_response(["ok" => false, "message" => "Missing schoolId."], 400);
+    }
+    $name = school_name_by_id($pdo, $schoolId);
+    json_response(["ok" => true, "school" => $name ? ["schoolId" => $schoolId, "schoolName" => $name] : null]);
   }
 
   if ($action === "logout") {

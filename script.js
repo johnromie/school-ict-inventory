@@ -180,6 +180,31 @@ async function api(action, options = {}) {
   return data;
 }
 
+async function lookupSchoolById(schoolId) {
+  const url = `${API_URL}?action=school_lookup&schoolId=${encodeURIComponent(schoolId)}`;
+  const response = await fetch(url, { method: "GET", credentials: "same-origin" });
+  const raw = await response.text();
+  let data = null;
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch (_error) {
+    data = null;
+  }
+  if (!response.ok || !data?.ok) {
+    return null;
+  }
+  return data.school || null;
+}
+
+async function registerSchoolOnServer(schoolId, schoolName) {
+  const data = await api("register_school", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ schoolId, schoolName }),
+  });
+  return data?.school || null;
+}
+
 function configureRoleUI(session) {
   const isAdmin = session && session.role === "admin";
   toolsPanel.classList.toggle("hidden", isAdmin);
@@ -373,15 +398,20 @@ adminLoginBtn.addEventListener("click", async () => {
   }
 });
 
-schoolRegisterBtn?.addEventListener("click", () => {
-  const schoolId = schoolIdInput?.value ?? "";
-  const schoolName = schoolNameInput?.value ?? "";
-  const ok = setSchoolRegistration({ schoolId, schoolName });
-  if (!ok) {
+schoolRegisterBtn?.addEventListener("click", async () => {
+  const { schoolId, schoolName } = getSchoolLoginInputs();
+  if (!schoolId || !schoolName) {
     setSchoolLoginMessage("Enter both School ID and School Name to register.", true);
     return;
   }
-  applySchoolRegistrationUI();
+  try {
+    await registerSchoolOnServer(schoolId, schoolName);
+    setSchoolRegistration({ schoolId, schoolName });
+    applySchoolRegistrationUI();
+    setSchoolLoginMessage("School registered. You can now log in on any device.", false);
+  } catch (error) {
+    setSchoolLoginMessage(error.message, true);
+  }
 });
 
 schoolChangeRegistrationBtn?.addEventListener("click", () => {
@@ -392,7 +422,26 @@ schoolChangeRegistrationBtn?.addEventListener("click", () => {
   schoolIdInput?.focus();
 });
 
-schoolIdInput?.addEventListener("input", updateSchoolLoginAvailability);
+let schoolLookupTimer = null;
+
+schoolIdInput?.addEventListener("input", () => {
+  updateSchoolLoginAvailability();
+  if (!schoolIdInput || !schoolNameInput) return;
+  const { schoolId } = getSchoolLoginInputs();
+  if (schoolLookupTimer) window.clearTimeout(schoolLookupTimer);
+  if (!schoolId) return;
+  schoolLookupTimer = window.setTimeout(async () => {
+    const lookupId = (schoolIdInput?.value ?? "").trim();
+    if (!lookupId) return;
+    const school = await lookupSchoolById(lookupId);
+    if (!school) return;
+    if (!schoolNameInput.value.trim()) {
+      schoolNameInput.value = school.schoolName;
+    }
+    updateSchoolLoginAvailability();
+  }, 350);
+});
+
 schoolNameInput?.addEventListener("input", updateSchoolLoginAvailability);
 
 schoolLoginBtn.addEventListener("click", async () => {
@@ -405,11 +454,14 @@ schoolLoginBtn.addEventListener("click", async () => {
   }
 
   if (!reg) {
-    const ok = setSchoolRegistration({ schoolId, schoolName });
-    if (!ok) {
-      setSchoolLoginMessage("Enter both School ID and School Name to register.", true);
+    try {
+      await registerSchoolOnServer(schoolId, schoolName);
+    } catch (error) {
+      setSchoolLoginMessage(error.message, true);
       return;
     }
+
+    setSchoolRegistration({ schoolId, schoolName });
     reg = getSchoolRegistration();
     applySchoolRegistrationUI();
   } else if (schoolId !== reg.schoolId || schoolName !== reg.schoolName) {
