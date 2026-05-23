@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ICT Inventory Management System</title>
-  <link rel="stylesheet" href="styles.css?v=20260218-2" />
+  <link rel="stylesheet" href="styles.css?v=20260523-1" />
 </head>
 <body data-page="login">
   <div class="govBanner">
@@ -27,43 +27,105 @@
 
   <main class="page">
     <section id="loginSection" class="panel loginPanel">
-      <h2>Login Account</h2>
-      <p class="hint">Use Admin/ICT login for combined all-schools data view. School login is only for school uploads.</p>
+      <div class="loginShell">
+        <div class="loginTitle">
+          <div class="loginTitleIcon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M4 21h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <path d="M6 21V9l6-4 6 4v12" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+              <path d="M9 21v-7h6v7" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+              <path d="M10 10h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <h2>Schools ICT Inventory Management System</h2>
+            <p>Schools Division of Marinduque</p>
+          </div>
+        </div>
 
-      <h3>Admin / ICT Login</h3>
-      <div class="formGrid2">
-        <label>
-          Username
-          <input id="adminUsername" type="text" placeholder="Enter admin username" />
-        </label>
-        <label>
-          Password
-          <input id="adminPassword" type="password" placeholder="Enter admin password" />
-        </label>
-      </div>
-      <button id="adminLoginBtn" class="btn secondary" type="button">Open Admin Combined View</button>
-      <p id="adminLoginMessage" class="hint"></p>
+        <div class="loginCard" role="region" aria-label="Login options">
+          <div class="loginCol">
+            <div class="loginColHead">
+              <div class="loginColIcon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2l8 4v6c0 5-3.5 9.4-8 10-4.5-.6-8-5-8-10V6l8-4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                  <path d="M9.5 11a2.5 2.5 0 1 1 5 0v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                  <path d="M8.5 13h7v5h-7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div>
+                <h3>Admin / ICT Login</h3>
+                <p class="hint">Use Admin/ICT login for combined all-schools data view. School login is only for school uploads.</p>
+              </div>
+            </div>
 
-      <hr />
+            <div class="loginForm">
+              <label class="field">
+                <span>Username</span>
+                <input id="adminUsername" class="inputIcon user" type="text" placeholder="Enter admin username" autocomplete="username" />
+              </label>
+              <label class="field">
+                <span>Password</span>
+                <input id="adminPassword" class="inputIcon lock" type="password" placeholder="Enter admin password" autocomplete="current-password" />
+              </label>
+              <button id="adminLoginBtn" class="btn loginBtn adminBtn" type="button">Open Admin Combined View</button>
+              <p id="adminLoginMessage" class="hint"></p>
+            </div>
+          </div>
 
-      <h3>School Login</h3>
-      <p class="hint">Access is only for registered Schools Division of Marinduque entries using School ID and School Name.</p>
-      <div class="formGrid2">
-        <label>
-          School ID
-          <input id="schoolId" type="text" placeholder="Enter school ID" />
-        </label>
-        <label>
-          School Name
-          <input id="schoolName" type="text" placeholder="Enter school name" />
-        </label>
+          <div class="loginDivider" aria-hidden="true"></div>
+
+          <div class="loginCol">
+            <div class="loginColHead">
+              <div class="loginColIcon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M4 10l8-5 8 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M6 10v10h12V10" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                  <path d="M9 20v-6h6v6" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                  <path d="M8 12h1M15 12h1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div>
+                <h3>School Login</h3>
+                <p class="hint">Access is only for registered Schools Division of Marinduque entries using School ID and School Name.</p>
+              </div>
+            </div>
+
+            <div class="loginForm">
+              <label class="field">
+                <span>School ID</span>
+                <input id="schoolId" class="inputIcon id" type="text" placeholder="Enter School ID" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>School Name</span>
+                <input id="schoolName" class="inputIcon school" type="text" placeholder="Enter School Name" autocomplete="organization" />
+              </label>
+
+              <div class="loginActions">
+                <button id="schoolRegisterBtn" class="btn ghost" type="button">Register School Account</button>
+                <button id="schoolChangeRegistrationBtn" class="btn ghost hidden" type="button">Change Registration</button>
+              </div>
+
+              <button id="schoolLoginBtn" class="btn loginBtn schoolBtn" type="button">Login to School Account</button>
+              <p id="schoolLoginMessage" class="hint"></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="loginReminder" role="note" aria-label="Important reminder">
+          <div class="reminderIcon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z" stroke="currentColor" stroke-width="1.8"/>
+              <path d="M12 10v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <path d="M12 7h.01" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <div class="reminderTitle">Important Reminder</div>
+            <div class="hint">Ensure that the information you provide is accurate and up to date. Unauthorized access is strictly prohibited.</div>
+          </div>
+        </div>
       </div>
-      <div class="loginActions">
-        <button id="schoolRegisterBtn" class="btn secondary" type="button">Register School Account</button>
-        <button id="schoolChangeRegistrationBtn" class="btn ghost hidden" type="button">Change Registration</button>
-      </div>
-      <button id="schoolLoginBtn" class="btn primary" type="button">Open School Upload Workspace</button>
-      <p id="schoolLoginMessage" class="hint"></p>
     </section>
 
     <section id="workspace" class="hidden">
@@ -193,6 +255,10 @@
     </section>
   </main>
 
-  <script src="script.js?v=20260218-2"></script>
+  <footer class="appFooter" aria-label="Footer">
+    © 2026 Schools Division of Marinduque. All rights reserved.
+  </footer>
+
+  <script src="script.js?v=20260523-1"></script>
 </body>
 </html>
