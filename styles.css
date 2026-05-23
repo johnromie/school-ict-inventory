@@ -259,9 +259,10 @@ body[data-page="login"] #loginSection.panel {
 .inputIcon {
   padding-right: 38px;
   height: 40px;
-  background-repeat: no-repeat;
-  background-size: 18px 18px;
-  background-position: right 12px center;
+  background-color: #fff;
+  background-repeat: no-repeat !important;
+  background-size: 18px 18px !important;
+  background-position: right 12px center !important;
 }
 
 .inputIcon.user {
