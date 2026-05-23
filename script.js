@@ -94,6 +94,24 @@ function setSchoolLoginMessage(text, isError = false) {
   schoolLoginMessageEl.style.color = isError ? "#991b1b" : "#0b5d4a";
 }
 
+function getSchoolLoginInputs() {
+  const schoolId = schoolIdInput?.value?.trim?.() ?? "";
+  const schoolName = schoolNameInput?.value?.trim?.() ?? "";
+  return { schoolId, schoolName };
+}
+
+function updateSchoolLoginAvailability() {
+  if (!schoolIdInput || !schoolNameInput || !schoolLoginBtn) return;
+  const reg = getSchoolRegistration();
+  if (reg) {
+    schoolLoginBtn.disabled = false;
+    return;
+  }
+
+  const { schoolId, schoolName } = getSchoolLoginInputs();
+  schoolLoginBtn.disabled = !(schoolId && schoolName);
+}
+
 function applySchoolRegistrationUI() {
   if (!schoolIdInput || !schoolNameInput || !schoolLoginBtn) return;
   const reg = getSchoolRegistration();
@@ -104,8 +122,13 @@ function applySchoolRegistrationUI() {
 
   if (!hasReg) {
     setSchoolLoginReadOnly(false);
-    schoolLoginBtn.disabled = true;
-    setSchoolLoginMessage("Please register your School ID and School Name first.", false);
+    updateSchoolLoginAvailability();
+    const { schoolId, schoolName } = getSchoolLoginInputs();
+    if (!schoolId || !schoolName) {
+      setSchoolLoginMessage("Enter your School ID and School Name to continue.", false);
+    } else {
+      setSchoolLoginMessage("Ready. Click “Login to School Account”.", false);
+    }
     return;
   }
 
@@ -113,7 +136,7 @@ function applySchoolRegistrationUI() {
   schoolNameInput.value = reg.schoolName;
   setSchoolLoginReadOnly(true);
   schoolLoginBtn.disabled = false;
-  setSchoolLoginMessage(`Registered: ${reg.schoolId} — ${reg.schoolName}`, false);
+  setSchoolLoginMessage(`Registered: ${reg.schoolId} - ${reg.schoolName}`, false);
 }
 
 function setMessage(text, isError = false) {
@@ -369,17 +392,27 @@ schoolChangeRegistrationBtn?.addEventListener("click", () => {
   schoolIdInput?.focus();
 });
 
+schoolIdInput?.addEventListener("input", updateSchoolLoginAvailability);
+schoolNameInput?.addEventListener("input", updateSchoolLoginAvailability);
+
 schoolLoginBtn.addEventListener("click", async () => {
-  const reg = getSchoolRegistration();
-  if (!reg) {
-    applySchoolRegistrationUI();
-    setSchoolLoginMessage("Please register first before logging in.", true);
+  let reg = getSchoolRegistration();
+  const { schoolId, schoolName } = getSchoolLoginInputs();
+
+  if (!schoolId || !schoolName) {
+    setSchoolLoginMessage("Enter School ID and School Name first.", true);
     return;
   }
 
-  const schoolId = schoolIdInput.value.trim();
-  const schoolName = schoolNameInput.value.trim();
-  if (schoolId !== reg.schoolId || schoolName !== reg.schoolName) {
+  if (!reg) {
+    const ok = setSchoolRegistration({ schoolId, schoolName });
+    if (!ok) {
+      setSchoolLoginMessage("Enter both School ID and School Name to register.", true);
+      return;
+    }
+    reg = getSchoolRegistration();
+    applySchoolRegistrationUI();
+  } else if (schoolId !== reg.schoolId || schoolName !== reg.schoolName) {
     setSchoolLoginReadOnly(true);
     schoolIdInput.value = reg.schoolId;
     schoolNameInput.value = reg.schoolName;
