@@ -181,28 +181,41 @@ async function api(action, options = {}) {
 }
 
 async function lookupSchoolById(schoolId) {
-  const url = `${API_URL}?action=school_lookup&schoolId=${encodeURIComponent(schoolId)}`;
-  const response = await fetch(url, { method: "GET", credentials: "same-origin" });
-  const raw = await response.text();
-  let data = null;
   try {
-    data = raw ? JSON.parse(raw) : null;
+    const url = `${API_URL}?action=school_lookup&schoolId=${encodeURIComponent(schoolId)}`;
+    const response = await fetch(url, { method: "GET", credentials: "same-origin" });
+    const raw = await response.text();
+    let data = null;
+    try {
+      data = raw ? JSON.parse(raw) : null;
+    } catch (_error) {
+      data = null;
+    }
+    if (!response.ok || !data?.ok) {
+      const message = data?.message || raw || "";
+      if (/unknown action/i.test(String(message))) return null;
+      return null;
+    }
+    return data.school || null;
   } catch (_error) {
-    data = null;
-  }
-  if (!response.ok || !data?.ok) {
     return null;
   }
-  return data.school || null;
 }
 
 async function registerSchoolOnServer(schoolId, schoolName) {
-  const data = await api("register_school", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ schoolId, schoolName }),
-  });
-  return data?.school || null;
+  try {
+    const data = await api("register_school", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ schoolId, schoolName }),
+    });
+    return data?.school || null;
+  } catch (error) {
+    if (/unknown action/i.test(String(error?.message || ""))) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 function configureRoleUI(session) {
@@ -405,10 +418,14 @@ schoolRegisterBtn?.addEventListener("click", async () => {
     return;
   }
   try {
-    await registerSchoolOnServer(schoolId, schoolName);
+    const serverReg = await registerSchoolOnServer(schoolId, schoolName);
     setSchoolRegistration({ schoolId, schoolName });
     applySchoolRegistrationUI();
-    setSchoolLoginMessage("School registered. You can now log in on any device.", false);
+    if (serverReg) {
+      setSchoolLoginMessage("School registered. You can now log in on any device.", false);
+    } else {
+      setSchoolLoginMessage("Registered on this device only. (Server update pending)", false);
+    }
   } catch (error) {
     setSchoolLoginMessage(error.message, true);
   }
